@@ -112,30 +112,39 @@ def should_reply(si, sn, ci, cn, ui, un, txt, server, channel):
       return True
   return False
 
+helpstring="""I'm just a wolf! Talk to me, I answer when you say my name. You can also change my nickname on your server.
+Type !help to show this text.
+Click this to add me to your server: https://discordapp.com/oauth2/authorize?client_id=477996444775743488&scope=bot
+"""
+
 @client.event
 async def on_message(message):
   ci, cn = channelidname(message.channel)
   si, sn = serveridname(message.server)
   ui = message.author.id
   un = message.author.name
-  print('%s/%s %s/%s %s/%s : %s' % (sn, si, cn, ci, message.author.name, message.author.id, message.content))
-  log_chat(si, sn, ci, cn, ui, un, 0, message.content)
+  txt = message.content
 
-  put(ci, message.content)
-  if should_reply(si, sn, ci, cn, ui, un, message.content, message.server, message.channel):
+  print('%s/%s %s/%s %s/%s : %s' % (sn, si, cn, ci, message.author.name, message.author.id, txt))
+  log_chat(si, sn, ci, cn, ui, un, 0, txt)
+
+  put(ci, txt)
+  if should_reply(si, sn, ci, cn, ui, un, txt, message.server, message.channel):
     rpl = get(ci)()
     await client.send_message(message.channel, rpl)
   convclean()
 
-  if message.content.startswith('!test'):
-    counter = 0
-    tmp = await client.send_message(message.channel, 'Calculating messages...')
-    async for log in client.logs_from(message.channel, limit=100):
-      if log.author == message.author:
-        counter += 1
-    await client.edit_message(tmp, 'You have {} messages.'.format(counter))
-  elif message.content.startswith('!sleep'):
-    await asyncio.sleep(5)
-    await client.send_message(message.channel, 'Done sleeping')
+  if txt.startswith('!help'):
+    await client.send_message(message.channel, helpstring)
+#  if txt.startswith('!test'):
+#    counter = 0
+#    tmp = await client.send_message(message.channel, 'Calculating messages...')
+#    async for log in client.logs_from(message.channel, limit=100):
+#      if log.author == message.author:
+#        counter += 1
+#    await client.edit_message(tmp, 'You have {} messages.'.format(counter))
+#  elif txt.startswith('!sleep'):
+#    await asyncio.sleep(5)
+#    await client.send_message(message.channel, 'Done sleeping')
 
 client.run(Config.get('Discord', 'Token'))
