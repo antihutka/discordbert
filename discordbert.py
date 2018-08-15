@@ -67,7 +67,7 @@ def get(convid):
   try:
     (s, f) = getconv(convid)
     s.send('\n'.encode('utf-8'))
-    return lambda: f.readline().rstrip()
+    return f.readline().rstrip()
   except Exception as e:
     traceback.print_exc(file=sys.stdout)
     del convos[convid]
@@ -130,7 +130,7 @@ async def on_message(message):
 
   put(ci, txt)
   if should_reply(si, sn, ci, cn, ui, un, txt, message.server, message.channel):
-    rpl = get(ci)()
+    rpl = get(ci)
     await client.send_message(message.channel, rpl)
   convclean()
 
