@@ -114,6 +114,9 @@ async def on_ready():
   print(client.user.name)
   print(client.user.id)
   print('------')
+  print('Trying to change presence')
+  await client.change_presence(game=discord.Game(name='Say my name or !help'))
+  print('Done')
 
 def serveridname(server):
   if server:
