@@ -151,6 +151,8 @@ def should_reply(si, sn, ci, cn, ui, un, txt, server, channel):
     return False
   if txt and (Config.get('Chat', 'Keyword') in txt.lower()):
     return True
+  if txt and client.user.id in txt:
+    return True
 #  if not cn:
 #    return True
   if txt and member and member.nick:
