@@ -203,6 +203,7 @@ async def on_message(message):
   else:
     put(ci, txt)
     if should_reply(si, sn, ci, cn, ui, un, txt, message.server, message.channel):
+      await client.send_typing(message.channel)
       rpl = await asyncio.get_event_loop().run_in_executor(None, lambda: get(ci))
       await client.send_message(message.channel, rpl)
     convclean()
