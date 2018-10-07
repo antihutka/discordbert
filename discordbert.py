@@ -8,7 +8,7 @@ import sys
 import traceback
 from time import time, sleep
 import re
-
+from random import uniform
 
 
 Config = ConfigParser()
@@ -27,6 +27,39 @@ def log_chat(si, sn, ci, cn, ui, un, sent, message):
   cur.execute("INSERT INTO `chat` (`server_id`, `server_name`, `channel_id`, `channel_name`, `user_id`, `user_name`, `sent`, `message`) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)", (si, sn, ci, cn, ui, un, sent, message))
   db.commit()
   db.close()
+
+options = {}
+
+def option_set(convid, option, value):
+  db, cur = get_dbcon()
+  cur.execute("REPLACE INTO `options` (`convid`, `option`, `value`) VALUES (%s,%s, %s)", (convid, option, str(value)))
+  db.commit()
+  db.close()
+  options[(convid, option)] = value
+
+def option_get_raw(convid, option):
+  if (convid, option) in options:
+    return options[(convid, option)]
+  db, cur = get_dbcon()
+  cur.execute("SELECT `value` FROM `options` WHERE `convid` = %s AND `option` = %s", (convid, option))
+  row = cur.fetchone()
+  if row != None:
+    options[(convid, option)] = row[0]
+    return row[0]
+  else:
+    return None
+
+def option_get_float(serverid, convid, option, def_u, def_g):
+  try:
+    oraw = option_get_raw(convid, option)
+    if oraw != None:
+      return float(oraw)
+  except Exception as e:
+    print("Error getting option %s for conv %d: %s" % (option, convid, str(e)))
+  if serverid:
+    return def_g
+  else:
+    return def_u
 
 
 convos = {}
@@ -94,6 +127,16 @@ def channelidname(channel):
   else:
     return (None, None)
 
+def option_valid(o, v):
+  if o == 'reply_prob':
+    if re.match(r'^([0-9]+|[0-9]*\.[0-9]+)$', v):
+      return True
+    else:
+      return False
+  else:
+    return False
+
+
 def should_reply(si, sn, ci, cn, ui, un, txt, server, channel):
   member = None
   if server:
@@ -105,17 +148,23 @@ def should_reply(si, sn, ci, cn, ui, un, txt, server, channel):
     return False
   if txt and (Config.get('Chat', 'Keyword') in txt.lower()):
     return True
-  if not cn:
-    return True
+#  if not cn:
+#    return True
   if txt and member and member.nick:
     if member.nick.lower() in txt.lower():
       return True
+  prob = option_get_float(si, ci, 'reply_prob', 1, 0)
+  if (uniform(0, 1) < prob):
+    return True
   return False
 
 helpstring="""I'm just a wolf! Talk to me, I answer when you say my name. You can also change my nickname on your server.
-Type !help to show this text.
+Type *!help* to show this text.
+Type *!set reply_prob P* to set reply probability in current chat to P (0 - 1.0).
 Click this to add me to your server: https://discordapp.com/oauth2/authorize?client_id=477996444775743488&scope=bot
 """
+
+cmd_replies = set()
 
 @client.event
 async def on_message(message):
@@ -126,25 +175,33 @@ async def on_message(message):
   txt = message.content
 
   print('%s/%s %s/%s %s/%s : %s' % (sn, si, cn, ci, message.author.name, message.author.id, txt))
+  if message.id in cmd_replies:
+    print('(not logging)')
+    return
   log_chat(si, sn, ci, cn, ui, un, 0, txt)
 
-  put(ci, txt)
-  if should_reply(si, sn, ci, cn, ui, un, txt, message.server, message.channel):
-    rpl = await asyncio.get_event_loop().run_in_executor(None, lambda: get(ci))
-    await client.send_message(message.channel, rpl)
-  convclean()
-
   if txt.startswith('!help'):
-    await client.send_message(message.channel, helpstring)
-#  if txt.startswith('!test'):
-#    counter = 0
-#    tmp = await client.send_message(message.channel, 'Calculating messages...')
-#    async for log in client.logs_from(message.channel, limit=100):
-#      if log.author == message.author:
-#        counter += 1
-#    await client.edit_message(tmp, 'You have {} messages.'.format(counter))
-#  elif txt.startswith('!sleep'):
-#    await asyncio.sleep(5)
-#    await client.send_message(message.channel, 'Done sleeping')
+    cmd_replies.add((await client.send_message(message.channel, helpstring)).id)
+  elif txt.startswith('!set '):
+    splt = txt.split()
+    if (len(splt) != 3):
+      cmd_replies.add((await client.send_message(message.channel, "< invalid syntax, use !set option value >")).id)
+      return
+    opt = splt[1]
+    val = splt[2]
+    if option_valid(opt, val):
+      option_set(ci, opt, val)
+      cmd_replies.add((await client.send_message(message.channel, "< option %s set to %s >" % (opt, val))).id)
+    else:
+      cmd_replies.add((await client.send_message(message.channel, "< invalid option or value >")).id)
+  elif txt.startswith('!clear'):
+    options.clear()
+    print('options cache flushed')
+  else:
+    put(ci, txt)
+    if should_reply(si, sn, ci, cn, ui, un, txt, message.server, message.channel):
+      rpl = await asyncio.get_event_loop().run_in_executor(None, lambda: get(ci))
+      await client.send_message(message.channel, rpl)
+    convclean()
 
 client.run(Config.get('Discord', 'Token'))
