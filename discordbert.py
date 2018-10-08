@@ -115,7 +115,7 @@ async def on_ready():
   print(client.user.id)
   print('------')
   print('Trying to change presence')
-  await client.change_presence(game=discord.Game(name='Say my name or !help'))
+  await client.change_presence(game=discord.Game(name='Say my name or /!help'))
   print('Done')
 
 def serveridname(server):
@@ -164,8 +164,8 @@ def should_reply(si, sn, ci, cn, ui, un, txt, server, channel):
   return False
 
 helpstring="""I'm just a wolf! Talk to me, I answer when you say my name. You can also change my nickname on your server.
-Type *!help* to show this text.
-Type *!set reply_prob P* to set reply probability in current chat to P (0 - 1.0).
+Type */!help* to show this text.
+Type */!set reply_prob P* to set reply probability in current chat to P (0 - 1.0).
 Click this to add me to your server: https://discordapp.com/oauth2/authorize?client_id=477996444775743488&scope=bot
 """
 
@@ -185,12 +185,12 @@ async def on_message(message):
     return
   log_chat(si, sn, ci, cn, ui, un, 0, txt)
 
-  if txt.startswith('!help'):
+  if txt.startswith('/!help'):
     cmd_replies.add((await client.send_message(message.channel, helpstring)).id)
-  elif txt.startswith('!set '):
+  elif txt.startswith('/!set '):
     splt = txt.split()
     if (len(splt) != 3):
-      cmd_replies.add((await client.send_message(message.channel, "< invalid syntax, use !set option value >")).id)
+      cmd_replies.add((await client.send_message(message.channel, "< invalid syntax, use /!set option value >")).id)
       return
     opt = splt[1]
     val = splt[2]
@@ -199,7 +199,7 @@ async def on_message(message):
       cmd_replies.add((await client.send_message(message.channel, "< option %s set to %s >" % (opt, val))).id)
     else:
       cmd_replies.add((await client.send_message(message.channel, "< invalid option or value >")).id)
-  elif txt.startswith('!clear'):
+  elif txt.startswith('/!clear'):
     options.clear()
     print('options cache flushed')
   else:
