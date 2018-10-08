@@ -179,6 +179,9 @@ async def on_message(message):
   un = message.author.name
   txt = message.content
 
+  if txt == "":
+    return
+
   print('%s/%s %s/%s %s/%s : %s' % (sn, si, cn, ci, message.author.name, message.author.id, txt))
   if message.id in cmd_replies:
     print('(not logging)')
