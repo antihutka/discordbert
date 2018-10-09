@@ -140,7 +140,9 @@ def option_valid(o, v):
     return False
 
 
-def should_reply(si, sn, ci, cn, ui, un, txt, server, channel):
+def should_reply(si, sn, ci, cn, ui, un, txt, server, channel, author):
+  if author.bot and option_get_float(si, ci, 'reply_to_bots', 0, 0) == 0:
+    return False
   member = None
   if server:
     member = server.get_member(client.user.id)
@@ -165,9 +167,11 @@ def should_reply(si, sn, ci, cn, ui, un, txt, server, channel):
 
 helpstring="""I'm just a wolf! Talk to me, I answer when you say my name. You can also change my nickname on your server.
 Type */!help* to show this text.
-Type */!set reply_prob P* to set reply probability in current chat to P (0 - 1.0).
+Type */!set reply_prob P* to set reply probability in current chat to P (0 - 1.0). Defaults to 0 in server channels, 1 in DMs.
 Click this to add me to your server: https://discordapp.com/oauth2/authorize?client_id=477996444775743488&scope=bot
 """
+
+#Type */!set reply_to_bots 0|1* to enable or disable. Defaults to 0.
 
 cmd_replies = set()
 
@@ -191,6 +195,9 @@ async def on_message(message):
   if txt.startswith('/!help'):
     cmd_replies.add((await client.send_message(message.channel, helpstring)).id)
   elif txt.startswith('/!set '):
+    if message.server and not message.author.permissions_in(message.channel).manage_channels:
+      cmd_replies.add((await client.send_message(message.channel, "< only people with manage_channels permission can set options >")).id)
+      return
     splt = txt.split()
     if (len(splt) != 3):
       cmd_replies.add((await client.send_message(message.channel, "< invalid syntax, use /!set option value >")).id)
@@ -207,7 +214,7 @@ async def on_message(message):
     print('options cache flushed')
   else:
     put(ci, txt)
-    if should_reply(si, sn, ci, cn, ui, un, txt, message.server, message.channel):
+    if should_reply(si, sn, ci, cn, ui, un, txt, message.server, message.channel, message.author):
       await client.send_typing(message.channel)
       rpl = await asyncio.get_event_loop().run_in_executor(None, lambda: get(ci))
       await client.send_message(message.channel, rpl)
