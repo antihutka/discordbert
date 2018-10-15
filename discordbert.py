@@ -177,6 +177,7 @@ cmd_replies = set()
 
 @client.event
 async def on_message(message):
+  msgcolor = ''
   ci, cn = channelidname(message.channel)
   si, sn = serveridname(message.server)
   ui = message.author.id
@@ -186,11 +187,23 @@ async def on_message(message):
   if txt == "":
     return
 
-  print('%s/%s %s/%s %s/%s : %s' % (sn, si, cn, ci, message.author.name, message.author.id, txt))
+  channel_ignored = False
+  if option_get_float(si, ci, 'ignore_channel', 0, 0) > 0:
+    channel_ignored = True
+    msgcolor = '\033[90m'
+  if not message.server:
+    msgcolor = '\033[96m'
+  if ui == client.user.id:
+    msgcolor = '\033[92m'
+
+  print(msgcolor + ('%s/%s %s/%s %s/%s : %s' % (sn, si, cn, ci, message.author.name, message.author.id, txt)) + '\033[0m')
   if message.id in cmd_replies:
     print('(not logging)')
     return
   log_chat(si, sn, ci, cn, ui, un, 0, txt)
+
+  if channel_ignored == True:
+    return
 
   if txt.startswith('/!help'):
     cmd_replies.add((await client.send_message(message.channel, helpstring)).id)
