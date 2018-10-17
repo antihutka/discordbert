@@ -177,6 +177,7 @@ cmd_replies = set()
 
 @client.event
 async def on_message(message):
+  start_time = time()
   msgcolor = ''
   ci, cn = channelidname(message.channel)
   si, sn = serveridname(message.server)
@@ -188,6 +189,8 @@ async def on_message(message):
     return
 
   channel_ignored = False
+  if message.author.bot:
+    msgcolor = '\033[34m'
   if option_get_float(si, ci, 'ignore_channel', 0, 0) > 0:
     channel_ignored = True
     msgcolor = '\033[90m'
@@ -229,8 +232,13 @@ async def on_message(message):
     put(ci, txt)
     if should_reply(si, sn, ci, cn, ui, un, txt, message.server, message.channel, message.author):
       await client.send_typing(message.channel)
-      rpl = await asyncio.get_event_loop().run_in_executor(None, lambda: get(ci))
-      await client.send_message(message.channel, rpl)
+      rpl_txt = await asyncio.get_event_loop().run_in_executor(None, lambda: get(ci))
+      rpl_msg = await client.send_message(message.channel, rpl_txt)
+      end_time = time()
+      reply_delay = end_time - start_time
+      if reply_delay > 20:
+        print('message took %f seconds to generate', reply_delay)
+        await client.edit_message(rpl_msg, rpl_txt + ('\n*reply delayed by %f seconds*' % (reply_delay)))
     convclean()
 
 client.run(Config.get('Discord', 'Token'))
