@@ -208,6 +208,9 @@ async def on_message(message):
   if channel_ignored == True:
     return
 
+  if txt.startswith('/!') and message.author.bot:
+    return
+
   if txt.startswith('/!help'):
     cmd_replies.add((await client.send_message(message.channel, helpstring)).id)
   elif txt.startswith('/!set '):
