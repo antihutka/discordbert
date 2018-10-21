@@ -131,7 +131,7 @@ def channelidname(channel):
     return (None, None)
 
 def option_valid(o, v):
-  if o == 'reply_prob':
+  if o == 'reply_prob' or o == 'max_bot_msg_length':
     if re.match(r'^([0-9]+|[0-9]*\.[0-9]+)$', v):
       return True
     else:
@@ -232,7 +232,8 @@ async def on_message(message):
     options.clear()
     print('options cache flushed')
   else:
-    put(ci, txt)
+    if (not message.author.bot) or (len(txt) <= option_get_float(si, ci, 'max_bot_msg_length', 200, 200)):
+      put(ci, txt)
     if should_reply(si, sn, ci, cn, ui, un, txt, message.server, message.channel, message.author):
       await client.send_typing(message.channel)
       rpl_txt = await asyncio.get_event_loop().run_in_executor(None, lambda: get(ci))
