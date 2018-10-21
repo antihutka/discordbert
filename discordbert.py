@@ -240,8 +240,8 @@ async def on_message(message):
       end_time = time()
       reply_delay = end_time - start_time
       if reply_delay > 20:
-        print('message took %f seconds to generate', reply_delay)
         await client.edit_message(rpl_msg, rpl_txt + ('\n*reply delayed by %f seconds*' % (reply_delay)))
+        print('message took %f seconds to generate' % (reply_delay))
     convclean()
 
 client.run(Config.get('Discord', 'Token'))
