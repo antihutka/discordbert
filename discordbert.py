@@ -165,11 +165,17 @@ def should_reply(si, sn, ci, cn, ui, un, txt, server, channel, author):
     return True
   return False
 
-helpstring="""I'm just a wolf! Talk to me, I answer when you say my name. You can also change my nickname on your server.
-Type */!help* to show this text.
-Type */!set reply_prob P* to set reply probability in current chat to P (0 - 1.0). Defaults to 0 in server channels, 1 in DMs.
-Click this to add me to your server: https://discordapp.com/oauth2/authorize?client_id=477996444775743488&scope=bot
-"""
+help_links="""[Add me to your server](https://discordapp.com/oauth2/authorize?client_id=477996444775743488&scope=bot)
+[Support server](https://discord.gg/EhNr4hR)
+[DBL link](https://discordbots.org/bot/477996444775743488)"""
+
+def make_help():
+  emb = discord.Embed(description="Sobert's silly help thing")
+  emb.add_field(name="/!help", value="Show this text")
+  emb.add_field(name="/!set reply_prob P", value="Set my reply probability for the current channel to P (0 to 1.0). Defaults to 0, except in DMs.")
+  emb.add_field(name="/!set max_max_bot_msg_length L", value="Don't process messages from bots longer than L characters. Defaults to 200.")
+  emb.add_field(name="Links and stuff", value=help_links)
+  return emb
 
 #Type */!set reply_to_bots 0|1* to enable or disable. Defaults to 0.
 
@@ -212,7 +218,7 @@ async def on_message(message):
     return
 
   if txt.startswith('/!help'):
-    cmd_replies.add((await client.send_message(message.channel, helpstring)).id)
+    await client.send_message(message.channel, embed=make_help())
   elif txt.startswith('/!set '):
     if message.server and not message.author.permissions_in(message.channel).manage_channels:
       cmd_replies.add((await client.send_message(message.channel, "< only people with manage_channels permission can set options >")).id)
