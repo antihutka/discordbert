@@ -40,6 +40,7 @@ def option_set(convid, option, value):
 def option_get_raw(convid, option):
   if (convid, option) in options:
     return options[(convid, option)]
+  print('raw getting option %s %s' % (convid, option))
   db, cur = get_dbcon()
   cur.execute("SELECT `value` FROM `options` WHERE `convid` = %s AND `option` = %s", (convid, option))
   row = cur.fetchone()
@@ -47,6 +48,7 @@ def option_get_raw(convid, option):
     options[(convid, option)] = row[0]
     return row[0]
   else:
+    options[(convid, option)] = None
     return None
 
 def option_get_float(serverid, convid, option, def_u, def_g):
@@ -131,7 +133,7 @@ def channelidname(channel):
     return (None, None)
 
 def option_valid(o, v):
-  if o == 'reply_prob' or o == 'max_bot_msg_length':
+  if o in ['reply_prob', 'max_bot_msg_length', 'mention_only', 'prefix_only']:
     if re.match(r'^([0-9]+|[0-9]*\.[0-9]+)$', v):
       return True
     else:
@@ -141,25 +143,44 @@ def option_valid(o, v):
 
 
 def should_reply(si, sn, ci, cn, ui, un, txt, server, channel, author):
+  opt_mention_only = option_get_float(si, ci, 'mention_only', 0, 1)
+  keywords = ["<@%s>" % client.user.id, "<@!%s>" % client.user.id]
+
+  # ignore empty messages
+  if not txt:
+    return False
+
+  # never reply to own messages
+  if ui == client.user.id:
+    return False
+
+  # ignore bots by default
   if author.bot and option_get_float(si, ci, 'reply_to_bots', 0, 0) == 0:
     return False
+
   member = None
   if server:
     member = server.get_member(client.user.id)
 
-  if ui == client.user.id:
-    return False
+  # check send perms
   if channel and member and (not channel.permissions_for(member).send_messages):
     return False
-  if txt and (Config.get('Chat', 'Keyword') in txt.lower()):
-    return True
-  if txt and client.user.id in txt:
-    return True
-#  if not cn:
-#    return True
-  if txt and member and member.nick:
-    if member.nick.lower() in txt.lower():
-      return True
+
+  if opt_mention_only <= 0:
+    keywords.append(Config.get('Chat', 'Keyword').lower())
+    if member and member.nick:
+      keywords.append(member.nick.lower())
+
+#  print("kw: ", keywords)
+  if option_get_float(si, ci, 'prefix_only', 0, 1) <= 0:
+    for kw in keywords:
+      if kw in txt.lower():
+        return True
+  else:
+    for kw in keywords:
+      if txt.lower().startswith(kw):
+        return True
+
   prob = option_get_float(si, ci, 'reply_prob', 1, 0)
   if (uniform(0, 1) < prob):
     return True
@@ -174,6 +195,8 @@ def make_help():
   emb.add_field(name="/!help", value="Show this text")
   emb.add_field(name="/!set reply_prob P", value="Set my reply probability for the current channel to P (0 to 1.0). Defaults to 0, except in DMs.")
   emb.add_field(name="/!set max_max_bot_msg_length L", value="Don't process messages from bots longer than L characters. Defaults to 200.")
+  emb.add_field(name="/!set prefix_only 0|1", value="Only match keywords as prefixes, not anywhere in the message.")
+  emb.add_field(name="/!set mention_only 0|1", value="Don't match on name, only @mention.")
   emb.add_field(name="Links and stuff", value=help_links)
   return emb
 
