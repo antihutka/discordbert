@@ -209,7 +209,7 @@ async def on_message(message):
   if message.id in cmd_replies:
     print('(not logging)')
     return
-  log_chat(si, sn, ci, cn, ui, un, 0, txt)
+  await asyncio.get_event_loop().run_in_executor(None, lambda: log_chat(si, sn, ci, cn, ui, un, 0, txt))
 
   if channel_ignored == True:
     return
