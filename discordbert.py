@@ -189,15 +189,15 @@ def should_reply(si, sn, ci, cn, ui, un, txt, server, channel, author):
 
   # ignore empty messages
   if not txt:
-    return False
+    return (False, txt)
 
   # never reply to own messages
   if ui == client.user.id:
-    return False
+    return (False, txt)
 
   # ignore bots by default
   if author.bot and option_get_float(si, ci, 'reply_to_bots', 0, 0) == 0:
-    return False
+    return (False, txt)
 
   member = None
   if server:
@@ -205,11 +205,10 @@ def should_reply(si, sn, ci, cn, ui, un, txt, server, channel, author):
 
   # check send perms
   if channel and member and (not channel.permissions_for(member).send_messages):
-    return False
+    return (False, txt)
 
-  if opt_extra_prefix != "" and txt.startswith(opt_extra_prefix):
-    print("would reply!")
-    return False #True
+  if opt_extra_prefix != "" and txt.lower().startswith(opt_extra_prefix.lower()):
+    return (True, txt[len(opt_extra_prefix):])
 
   if opt_mention_only <= 0:
     keywords.append(Config.get('Chat', 'Keyword').lower())
@@ -220,16 +219,16 @@ def should_reply(si, sn, ci, cn, ui, un, txt, server, channel, author):
   if option_get_float(si, ci, 'prefix_only', 0, 1) <= 0:
     for kw in keywords:
       if kw in txt.lower():
-        return True
+        return (True, txt)
   else:
     for kw in keywords:
       if txt.lower().startswith(kw):
-        return True
+        return (True, txt)
 
   prob = option_get_float(si, ci, 'reply_prob', 1, 0)
   if (uniform(0, 1) < prob):
-    return True
-  return False
+    return (True, txt)
+  return (False, txt)
 
 help_links="""[Add me to your server](https://discordapp.com/oauth2/authorize?client_id=477996444775743488&scope=bot)
 [Support server](https://discord.gg/EhNr4hR)
@@ -238,10 +237,12 @@ help_links="""[Add me to your server](https://discordapp.com/oauth2/authorize?cl
 def make_help():
   emb = discord.Embed(description="Sobert's silly help thing")
   emb.add_field(name="/!help", value="Show this text")
-  emb.add_field(name="/!set reply_prob P", value="Set my reply probability for the current channel to P (0 to 1.0). Defaults to 0, except in DMs.")
-  emb.add_field(name="/!set max_max_bot_msg_length L", value="Don't process messages from bots longer than L characters. Defaults to 200.")
-  emb.add_field(name="/!set prefix_only 0|1", value="Only match keywords as prefixes, not anywhere in the message.")
-  emb.add_field(name="/!set mention_only 0|1", value="Don't match on name, only @mention.")
+  emb.add_field(name="/!set reply_prob **P**", value="Set my reply probability for the current channel to **P** (0 to 1.0). Defaults to 0, except in DMs.")
+  emb.add_field(name="/!set max_max_bot_msg_length **L**", value="Don't process messages from bots longer than **L** characters. Defaults to 200.")
+  emb.add_field(name="/!set prefix_only **0|1**", value="Only match keywords as prefixes, not anywhere in the message.")
+  emb.add_field(name="/!set mention_only **0|1**", value="Don't match on name, only @mention.")
+  emb.add_field(name="/!set extra_prefix **P**", value="Set an additional prefix to reply to")
+  emb.add_field(name="/!set **option_name**", value="Unsets a previously set option")
   emb.add_field(name="Links and stuff", value=help_links)
   return emb
 
@@ -281,6 +282,9 @@ async def on_message(message):
   for u in message.mentions:
     await asyncio.get_event_loop().run_in_executor(None, lambda: log_mention(u.id, u.name, u.mention))
 
+  if ui == client.user.id:
+    return
+
   if channel_ignored == True:
     return
 
@@ -316,12 +320,15 @@ async def on_message(message):
     print('options cache flushed')
 
   else:
+    (shld_reply, new_text) = should_reply(si, sn, ci, cn, ui, un, txt, message.server, message.channel, message.author)
+
     if (not message.author.bot) or (len(txt) <= option_get_float(si, ci, 'max_bot_msg_length', 200, 200)):
-      txt2 = txt
+      txt2 = new_text
       for u in message.mentions:
         txt2 = txt2.replace(u.mention, u.name)
       put(ci, txt2)
-    if should_reply(si, sn, ci, cn, ui, un, txt, message.server, message.channel, message.author):
+
+    if shld_reply:
       await client.send_typing(message.channel)
       rpl_txt = await asyncio.get_event_loop().run_in_executor(None, lambda: get(ci))
       rpl_msg = await client.send_message(message.channel, rpl_txt)
