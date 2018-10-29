@@ -29,10 +29,20 @@ def log_chat(si, sn, ci, cn, ui, un, message, is_bot):
   db, cur = get_dbcon()
   cur.execute("INSERT INTO `chat` (`server_id`, `server_name`, `channel_id`, `channel_name`, `user_id`, `user_name`, `message`) VALUES (%s, %s, %s, %s, %s, %s, %s)", (si, sn, ci, cn, ui, un, message))
   if is_bot and ui not in bots_logged:
-    cur.execute("INSERT IGNORE INTO `bots` (`id`) VALUES (%s)", (ui,))
+    cur.execute("INSERT INTO `bots` (`id`) VALUES (%s) ON DUPLICATE KEY UPDATE id=id", (ui,))
     bots_logged.add(ui)
   db.commit()
   db.close()
+
+mentions_logged = set()
+def log_mention(uid, name, mention):
+  if (name, mention) in mentions_logged:
+    return
+  db, cur = get_dbcon()
+  cur.execute("INSERT INTO `mentions` (`user_id`, `name`, `mention`) VALUES (%s, %s, %s) ON DUPLICATE KEY UPDATE counter = counter + 1", (uid, name, mention))
+  db.commit()
+  db.close()
+  mentions_logged.add((name, mention))
 
 options = {}
 
@@ -239,6 +249,8 @@ async def on_message(message):
     print('(not logging)')
     return
   await asyncio.get_event_loop().run_in_executor(None, lambda: log_chat(si, sn, ci, cn, ui, un, txt, message.author.bot))
+  for u in message.mentions:
+    await asyncio.get_event_loop().run_in_executor(None, lambda: log_mention(u.id, u.name, u.mention))
 
   if channel_ignored == True:
     return
