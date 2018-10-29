@@ -53,6 +53,13 @@ def option_set(convid, option, value):
   db.close()
   options[(convid, option)] = value
 
+def option_unset(convid, option):
+  db, cur = get_dbcon()
+  cur.execute("DELETE FROM `options` WHERE `convid`=%s AND `option` = %s", (convid, option))
+  db.commit()
+  db.close()
+  options[(convid, option)] = None
+
 def option_get_raw(convid, option):
   if (convid, option) in options:
     return options[(convid, option)]
@@ -79,6 +86,17 @@ def option_get_float(serverid, convid, option, def_u, def_g):
   else:
     return def_u
 
+def option_get_string(serverid, convid, option, def_u, def_g):
+  try:
+    oraw = option_get_raw(convid, option)
+    if oraw != None:
+      return oraw
+  except Exception as e:
+    print("Error getting string option %s for conv %d: %s" % (option, convid, str(e)))
+  if serverid:
+    return def_g
+  else:
+    return def_u
 
 convos = {}
 times = {}
@@ -154,12 +172,19 @@ def option_valid(o, v):
       return True
     else:
       return False
+  if o == 'extra_prefix':
+    if re.match(r'^\S+$', v):
+      return True
+    else:
+      return False
   else:
     return False
 
 
 def should_reply(si, sn, ci, cn, ui, un, txt, server, channel, author):
   opt_mention_only = option_get_float(si, ci, 'mention_only', 0, 1)
+  opt_extra_prefix = option_get_string(si, ci, 'extra_prefix', "", "")
+
   keywords = ["<@%s>" % client.user.id, "<@!%s>" % client.user.id]
 
   # ignore empty messages
@@ -181,6 +206,10 @@ def should_reply(si, sn, ci, cn, ui, un, txt, server, channel, author):
   # check send perms
   if channel and member and (not channel.permissions_for(member).send_messages):
     return False
+
+  if opt_extra_prefix != "" and txt.startswith(opt_extra_prefix):
+    print("would reply!")
+    return False #True
 
   if opt_mention_only <= 0:
     keywords.append(Config.get('Chat', 'Keyword').lower())
@@ -260,24 +289,32 @@ async def on_message(message):
 
   if txt.startswith('/!help'):
     await client.send_message(message.channel, embed=make_help())
+
   elif txt.startswith('/!set '):
     if message.server and not message.author.permissions_in(message.channel).manage_channels:
       cmd_replies.add((await client.send_message(message.channel, "< only people with manage_channels permission can set options >")).id)
       return
     splt = txt.split()
-    if (len(splt) != 3):
+    if (len(splt) == 3):
+      opt = splt[1]
+      val = splt[2]
+      if option_valid(opt, val):
+        option_set(ci, opt, val)
+        cmd_replies.add((await client.send_message(message.channel, "< option %s set to %s >" % (opt, val))).id)
+      else:
+        cmd_replies.add((await client.send_message(message.channel, "< invalid option or value >")).id)
+    elif (len(splt) == 2):
+      opt = splt[1]
+      option_unset(ci, opt)
+      await client.send_message(message.channel, "< option %s unset >" % (opt,))
+    else:
       cmd_replies.add((await client.send_message(message.channel, "< invalid syntax, use /!set option value >")).id)
       return
-    opt = splt[1]
-    val = splt[2]
-    if option_valid(opt, val):
-      option_set(ci, opt, val)
-      cmd_replies.add((await client.send_message(message.channel, "< option %s set to %s >" % (opt, val))).id)
-    else:
-      cmd_replies.add((await client.send_message(message.channel, "< invalid option or value >")).id)
+
   elif txt.startswith('/!clear'):
     options.clear()
     print('options cache flushed')
+
   else:
     if (not message.author.bot) or (len(txt) <= option_get_float(si, ci, 'max_bot_msg_length', 200, 200)):
       txt2 = txt
