@@ -22,9 +22,9 @@ def get_dbcon():
   cur.execute('SET NAMES utf8mb4')
   return db, cur
 
-def log_chat(si, sn, ci, cn, ui, un, sent, message):
+def log_chat(si, sn, ci, cn, ui, un, message):
   db, cur = get_dbcon()
-  cur.execute("INSERT INTO `chat` (`server_id`, `server_name`, `channel_id`, `channel_name`, `user_id`, `user_name`, `sent`, `message`) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)", (si, sn, ci, cn, ui, un, sent, message))
+  cur.execute("INSERT INTO `chat` (`server_id`, `server_name`, `channel_id`, `channel_name`, `user_id`, `user_name`, `message`) VALUES (%s, %s, %s, %s, %s, %s, %s)", (si, sn, ci, cn, ui, un, message))
   db.commit()
   db.close()
 
@@ -232,7 +232,7 @@ async def on_message(message):
   if message.id in cmd_replies:
     print('(not logging)')
     return
-  await asyncio.get_event_loop().run_in_executor(None, lambda: log_chat(si, sn, ci, cn, ui, un, 0, txt))
+  await asyncio.get_event_loop().run_in_executor(None, lambda: log_chat(si, sn, ci, cn, ui, un, txt))
 
   if channel_ignored == True:
     return
