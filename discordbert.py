@@ -262,7 +262,10 @@ async def on_message(message):
     print('options cache flushed')
   else:
     if (not message.author.bot) or (len(txt) <= option_get_float(si, ci, 'max_bot_msg_length', 200, 200)):
-      put(ci, txt)
+      txt2 = txt
+      for u in message.mentions:
+        txt2 = txt2.replace(u.mention, u.name)
+      put(ci, txt2)
     if should_reply(si, sn, ci, cn, ui, un, txt, message.server, message.channel, message.author):
       await client.send_typing(message.channel)
       rpl_txt = await asyncio.get_event_loop().run_in_executor(None, lambda: get(ci))
