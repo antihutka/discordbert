@@ -9,6 +9,7 @@ import traceback
 from time import time, sleep
 import re
 from random import uniform
+import concurrent.futures
 
 
 Config = ConfigParser()
@@ -97,6 +98,12 @@ def option_get_string(serverid, convid, option, def_u, def_g):
     return def_g
   else:
     return def_u
+
+executors = {}
+def get_executor(key):
+  if key not in executors:
+    executors[key]=concurrent.futures.ThreadPoolExecutor(max_workers=1)
+  return executors[key]
 
 convos = {}
 times = {}
@@ -278,9 +285,9 @@ async def on_message(message):
   if message.id in cmd_replies:
     print('(not logging)')
     return
-  await asyncio.get_event_loop().run_in_executor(None, lambda: log_chat(si, sn, ci, cn, ui, un, txt, message.author.bot))
+  await asyncio.get_event_loop().run_in_executor(get_executor("log"), lambda: log_chat(si, sn, ci, cn, ui, un, txt, message.author.bot))
   for u in message.mentions:
-    await asyncio.get_event_loop().run_in_executor(None, lambda: log_mention(u.id, u.name, u.mention))
+    await asyncio.get_event_loop().run_in_executor(get_executor("log"), lambda: log_mention(u.id, u.name, u.mention))
 
   if ui == client.user.id:
     return
@@ -326,11 +333,11 @@ async def on_message(message):
       txt2 = new_text
       for u in message.mentions:
         txt2 = txt2.replace(u.mention, u.name)
-      put(ci, txt2)
+      await asyncio.get_event_loop().run_in_executor(get_executor(ci), lambda: put(ci, txt2))
 
     if shld_reply:
       await client.send_typing(message.channel)
-      rpl_txt = await asyncio.get_event_loop().run_in_executor(None, lambda: get(ci))
+      rpl_txt = await asyncio.get_event_loop().run_in_executor(get_executor(ci), lambda: get(ci))
       rpl_msg = await client.send_message(message.channel, rpl_txt)
       end_time = time()
       reply_delay = end_time - start_time
