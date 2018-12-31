@@ -281,7 +281,9 @@ async def on_message(message):
   if ui == client.user.id:
     msgcolor = '\033[92m'
 
-  print(msgcolor + ('%s/%s %s/%s %s/%s : %s' % (sn, si, cn, ci, message.author.name, message.author.id, txt)) + '\033[0m')
+  if not channel_ignored:
+    print(msgcolor + ('%s/%s %s/%s %s/%s : %s' % (sn, si, cn, ci, message.author.name, message.author.id, txt)) + '\033[0m')
+
   if message.id in cmd_replies:
     print('(not logging)')
     return
