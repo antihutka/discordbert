@@ -245,7 +245,7 @@ def make_help():
   emb = discord.Embed(description="Sobert's silly help thing")
   emb.add_field(name="/!help", value="Show this text")
   emb.add_field(name="/!set reply_prob **P**", value="Set my reply probability for the current channel to **P** (0 to 1.0). Defaults to 0, except in DMs.")
-  emb.add_field(name="/!set max_max_bot_msg_length **L**", value="Don't process messages from bots longer than **L** characters. Defaults to 200.")
+  emb.add_field(name="/!set max_bot_msg_length **L**", value="Don't process messages from bots longer than **L** characters. Defaults to 200.")
   emb.add_field(name="/!set prefix_only **0|1**", value="Only match keywords as prefixes, not anywhere in the message.")
   emb.add_field(name="/!set mention_only **0|1**", value="Don't match on name, only @mention.")
   emb.add_field(name="/!set extra_prefix **P**", value="Set an additional prefix to reply to")
