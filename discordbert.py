@@ -114,6 +114,7 @@ def getconv(convid):
     s.connect((Config.get('Backend', 'Host'), Config.getint('Backend', 'Port')))
     f = s.makefile()
     convos[convid] = (s,f)
+    print('Number of active conversations: %d' % (len(convos),))
   times[convid] = time()
   return convos[convid]
 
@@ -127,6 +128,7 @@ def convclean():
       s.close()
       convos[convid][1].close()
       del convos[convid]
+      print('Number of active conversations: %d' % (len(convos),))
 
 def put(convid, text):
   if text == '':
