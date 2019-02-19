@@ -160,7 +160,7 @@ async def on_ready():
   print(client.user.id)
   print('------')
   print('Trying to change presence')
-  await client.change_presence(game=discord.Game(name='Say my name or /!help'))
+  await client.change_presence(game=discord.Game(name='@ me name or /!help'))
   print('Done')
 
 def serveridname(server):
@@ -189,6 +189,11 @@ def option_valid(o, v):
   else:
     return False
 
+def can_send(server, channel):
+  if (not server) or (not channel):
+    return True
+  member = server.get_member(client.user.id)
+  return channel.permissions_for(member).send_messages
 
 def should_reply(si, sn, ci, cn, ui, un, txt, server, channel, author):
   opt_mention_only = option_get_float(si, ci, 'mention_only', 0, 1)
@@ -272,12 +277,16 @@ async def on_message(message):
   if txt == "":
     return
 
+  cansend = can_send(message.server, message.channel)
+
   channel_ignored = False
   if message.author.bot:
     msgcolor = '\033[34m'
   if option_get_float(si, ci, 'ignore_channel', 0, 0) > 0:
     channel_ignored = True
     msgcolor = '\033[90m'
+  if not cansend:
+    msgcolor = '\033[31m'
   if not message.server:
     msgcolor = '\033[96m'
   if ui == client.user.id:
@@ -292,6 +301,9 @@ async def on_message(message):
   await asyncio.get_event_loop().run_in_executor(get_executor("log"), lambda: log_chat(si, sn, ci, cn, ui, un, txt, message.author.bot))
   for u in message.mentions:
     await asyncio.get_event_loop().run_in_executor(get_executor("log"), lambda: log_mention(u.id, u.name, u.mention))
+
+  if not cansend:
+    return
 
   if ui == client.user.id:
     return
