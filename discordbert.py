@@ -10,12 +10,15 @@ from time import time, sleep
 import re
 from random import uniform
 import concurrent.futures
-
+from httpnn import HTTPNN
 
 Config = ConfigParser()
 Config.read(sys.argv[1])
 
 logging.basicConfig(level=logging.INFO)
+
+nn = HTTPNN(Config.get('Backend', 'Url'), Config.get('Backend', 'Keyprefix'))
+asyncio.get_event_loop().run_until_complete(nn.initialize())
 
 def get_dbcon():
   db = MySQLdb.connect(host=Config.get('Database', 'Host'), user=Config.get('Database', 'User'), passwd=Config.get('Database', 'Password'), db=Config.get('Database', 'Database'), charset='utf8')
@@ -98,58 +101,6 @@ def option_get_string(serverid, convid, option, def_u, def_g):
     return def_g
   else:
     return def_u
-
-executors = {}
-def get_executor(key):
-  if key not in executors:
-    executors[key]=concurrent.futures.ThreadPoolExecutor(max_workers=1)
-  return executors[key]
-
-convos = {}
-times = {}
-
-def getconv(convid):
-  if convid not in convos:
-    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    s.connect((Config.get('Backend', 'Host'), Config.getint('Backend', 'Port')))
-    f = s.makefile()
-    convos[convid] = (s,f)
-    print('Number of active conversations: %d' % (len(convos),))
-  times[convid] = time()
-  return convos[convid]
-
-def convclean():
-  now = time()
-  for convid in times:
-    if (convid in convos) and (times[convid] + Config.getfloat('Chat', 'Timeout') * 60 * 60 < now):
-      print('Deleting conversation %s' % (convid,))
-      s = convos[convid][0]
-      s.shutdown(socket.SHUT_RDWR)
-      s.close()
-      convos[convid][1].close()
-      del convos[convid]
-      print('Number of active conversations: %d' % (len(convos),))
-
-def put(convid, text):
-  if text == '':
-    return
-  text = re.sub('[\r\n]+', '\n',text).strip("\r\n")
-  try:
-    (s, f) = getconv(convid)
-    s.send((text + '\n').encode('utf-8', 'ignore'))
-  except Exception as e:
-    traceback.print_exc(file=sys.stdout)
-    del convos[convid]
-
-def get(convid):
-  try:
-    (s, f) = getconv(convid)
-    s.send('\n'.encode('utf-8'))
-    return f.readline().rstrip()
-  except Exception as e:
-    traceback.print_exc(file=sys.stdout)
-    del convos[convid]
-    return ''
 
 client = discord.Client()
 
@@ -264,6 +215,8 @@ def make_help():
 
 cmd_replies = set()
 
+logexec = concurrent.futures.ThreadPoolExecutor(max_workers=1)
+
 @client.event
 async def on_message(message):
   start_time = time()
@@ -298,9 +251,9 @@ async def on_message(message):
   if message.id in cmd_replies:
     print('(not logging)')
     return
-  await asyncio.get_event_loop().run_in_executor(get_executor("log"), lambda: log_chat(si, sn, ci, cn, ui, un, txt, message.author.bot))
+  await asyncio.get_event_loop().run_in_executor(logexec, lambda: log_chat(si, sn, ci, cn, ui, un, txt, message.author.bot))
   for u in message.mentions:
-    await asyncio.get_event_loop().run_in_executor(get_executor("log"), lambda: log_mention(u.id, u.name, u.mention))
+    await asyncio.get_event_loop().run_in_executor(logexec, lambda: log_mention(u.id, u.name, u.mention))
 
   if not cansend:
     return
@@ -349,17 +302,16 @@ async def on_message(message):
       txt2 = new_text
       for u in message.mentions:
         txt2 = txt2.replace(u.mention, u.name)
-      await asyncio.get_event_loop().run_in_executor(get_executor(ci), lambda: put(ci, txt2))
+      await nn.put(str(ci), txt2)
 
     if shld_reply:
       await client.send_typing(message.channel)
-      rpl_txt = await asyncio.get_event_loop().run_in_executor(get_executor(ci), lambda: get(ci))
+      rpl_txt = await nn.get(str(ci))
       rpl_msg = await client.send_message(message.channel, rpl_txt)
       end_time = time()
       reply_delay = end_time - start_time
       if reply_delay > 20:
         await client.edit_message(rpl_msg, rpl_txt + ('\n*reply delayed by %f seconds*' % (reply_delay)))
         print('message took %f seconds to generate' % (reply_delay))
-    convclean()
 
 client.run(Config.get('Discord', 'Token'))
