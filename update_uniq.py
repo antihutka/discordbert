@@ -6,14 +6,18 @@ from botlib.db import with_cursor
 
 read_config()
 
+@with_cursor
 def add_new_chats(cur):
-  cur.execute("INSERT INTO chat_uniqueness(channel_id) "
-              "  SELECT channel_id FROM chat_counters "
-              "    WHERE channel_id NOT IN (SELECT channel_id FROM chat_uniqueness) AND user_id NOT IN (SELECT id FROM bots) "
-              "    GROUP BY channel_id "
-              "    HAVING SUM(message_count) > 1")
+  cur.execute("SELECT channel_id FROM chat_counters "
+              "  WHERE channel_id NOT IN (SELECT channel_id FROM chat_uniqueness) AND user_id NOT IN (SELECT id FROM bots) "
+              "  GROUP BY channel_id "
+              "  HAVING SUM(message_count) > 100")
+  vals = cur.fetchall()
+  cur.executemany("INSERT INTO chat_uniqueness(channel_id) VALUES (%s)", vals)
   if cur.rowcount > 0:
     print("Added %d new chats" % cur.rowcount)
+
+#         (SELECT COALESCE(CONCAT(server_name, "/", channel_name), user_name) FROM chat WHERE chat.channel_id = a.channel_id AND user_id NOT IN (SELECT id FROM bots) ORDER BY id DESC LIMIT 1) as chatname
 
 
 get_chats_q = """
@@ -24,15 +28,14 @@ SELECT * FROM (
          age,
          CAST((100 * (message_count - last_count))/(100+message_count) + age / (1440 * 7)  AS DOUBLE) AS score,
          COALESCE(uniqueness, -1) AS uniqueness,
-         chatname
+         "bleep" AS chatname
   FROM (
     SELECT channel_id,
-           (SELECT SUM(message_count) FROM chat_counters WHERE chat_counters.channel_id = chat_uniqueness.channel_id) AS message_count,
+           message_count,
            last_count,
            TIMESTAMPDIFF(MINUTE, last_update, CURRENT_TIMESTAMP) AS age,
-           uniqueness,
-           (SELECT COALESCE(CONCAT(server_name, "/", channel_name), user_name) FROM chat WHERE chat.channel_id = chat_uniqueness.channel_id AND user_id NOT IN (SELECT id FROM bots) ORDER BY id DESC LIMIT 1) as chatname
-    FROM chat_uniqueness
+           uniqueness
+    FROM chat_uniqueness LEFT JOIN channel_counts_nobots USING (channel_id)
   ) a
 ) b WHERE score > 0.1 OR uniqueness < 0 ORDER BY score DESC LIMIT 10;
 """
@@ -61,7 +64,6 @@ def write_score(cur, channel_id, uniq, cnt):
 
 @with_cursor
 def update_step(cur):
-  add_new_chats(cur)
   chats_to_update = get_scores(cur)
   if not chats_to_update:
     print("No chats to update")
@@ -72,7 +74,7 @@ def update_step(cur):
   server_id = get_server_for_channel(cur, channel_id)
   print("Updating stats for %s %d %s" % (server_id, channel_id, chatname))
   new_uniq = get_score(cur, server_id, channel_id)
-  print("Changed uniq from %f to %f (%f)" % (uniq, new_uniq, new_uniq-uniq))
+  print("Changed uniq from %f to %f (%f)" % (uniq, new_uniq, float(new_uniq)-float(uniq)))
   write_score(cur, channel_id, new_uniq, msg_count)
   return score
 
@@ -80,6 +82,7 @@ varsleep = 60
 
 while True:
   starttime = time.time()
+  add_new_chats()
   score = update_step()
   endtime = time.time()
   elaps = endtime-starttime
