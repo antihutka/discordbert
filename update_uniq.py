@@ -65,16 +65,28 @@ def update_step(cur):
   chats_to_update = get_scores(cur)
   if not chats_to_update:
     print("No chats to update")
-    return 60
+    return 0
   for i in chats_to_update:
     print("Chat: %16d New: %6d / %6d updated: %6d minutes ago score: %4.2f uniq: %.3f %s" % i)
   (channel_id, msg_count, msg_new, age, score, uniq, chatname) = chats_to_update[0]
   server_id = get_server_for_channel(cur, channel_id)
   print("Updating stats for %s %d %s" % (server_id, channel_id, chatname))
   new_uniq = get_score(cur, server_id, channel_id)
-  print("New uniq = %f" % new_uniq)
+  print("Changed uniq from %f to %f (%f)" % (uniq, new_uniq, new_uniq-uniq))
   write_score(cur, channel_id, new_uniq, msg_count)
+  return score
+
+varsleep = 60
 
 while True:
-  update_step()
-  time.sleep(5)
+  starttime = time.time()
+  score = update_step()
+  endtime = time.time()
+  elaps = endtime-starttime
+  if score < 0.9:
+    varsleep = varsleep + 1
+  if score > 1.1 and varsleep > 10:
+    varsleep = varsleep - 1
+  sleeptime = (elaps * 10 + varsleep) / max(0.25, score)
+  print("Took %f, sleep for %f" % (elaps, sleeptime))
+  time.sleep(sleeptime)
