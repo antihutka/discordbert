@@ -17,7 +17,6 @@ def add_new_chats(cur):
   if cur.rowcount > 0:
     print("Added %d new chats" % cur.rowcount)
 
-#         (SELECT COALESCE(CONCAT(server_name, "/", channel_name), user_name) FROM chat WHERE chat.channel_id = a.channel_id AND user_id NOT IN (SELECT id FROM bots) ORDER BY id DESC LIMIT 1) as chatname
 
 
 get_chats_q = """
@@ -28,7 +27,7 @@ SELECT * FROM (
          age,
          CAST((100 * (message_count - last_count))/(100+message_count) + age / (1440 * 7)  AS DOUBLE) AS score,
          COALESCE(uniqueness, -1) AS uniqueness,
-         "bleep" AS chatname
+         (SELECT COALESCE(CONCAT(server_name, "/", channel_name), user_name) FROM chat WHERE chat.channel_id = a.channel_id AND user_id NOT IN (SELECT id FROM bots) ORDER BY id DESC LIMIT 1) as chatname
   FROM (
     SELECT channel_id,
            message_count,
@@ -78,7 +77,7 @@ def update_step(cur):
   write_score(cur, channel_id, new_uniq, msg_count)
   return score
 
-varsleep = 60
+varsleep = 300
 
 while True:
   starttime = time.time()
