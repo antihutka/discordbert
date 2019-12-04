@@ -111,7 +111,7 @@ async def on_ready():
   print(client.user.id)
   print('------')
   print('Trying to change presence')
-  await client.change_presence(game=discord.Game(name='@ me name or /!help'))
+  await client.change_presence(activity=discord.Game(name='@ me name or /!help'))
   print('Done')
 
 def serveridname(server):
@@ -222,7 +222,7 @@ async def on_message(message):
   start_time = time()
   msgcolor = ''
   ci, cn = channelidname(message.channel)
-  si, sn = serveridname(message.server)
+  si, sn = serveridname(message.guild)
   ui = message.author.id
   un = message.author.name
   txt = message.content
@@ -230,7 +230,7 @@ async def on_message(message):
   if txt == "":
     return
 
-  cansend = can_send(message.server, message.channel)
+  cansend = can_send(message.guild, message.channel)
 
   channel_ignored = False
   if message.author.bot:
@@ -240,7 +240,7 @@ async def on_message(message):
     msgcolor = '\033[90m'
   if not cansend:
     msgcolor = '\033[31m'
-  if not message.server:
+  if not message.guild:
     msgcolor = '\033[96m'
   if ui == client.user.id:
     msgcolor = '\033[92m'
@@ -268,11 +268,11 @@ async def on_message(message):
     return
 
   if txt.startswith('/!help'):
-    await client.send_message(message.channel, embed=make_help())
+    await message.channel.send(embed=make_help())
 
   elif txt.startswith('/!set '):
-    if message.server and not message.author.permissions_in(message.channel).manage_channels:
-      cmd_replies.add((await client.send_message(message.channel, "< only people with manage_channels permission can set options >")).id)
+    if message.guild and not message.author.permissions_in(message.channel).manage_channels:
+      cmd_replies.add((await message.channel.send("< only people with manage_channels permission can set options >")).id)
       return
     splt = txt.split()
     if (len(splt) == 3):
@@ -280,15 +280,15 @@ async def on_message(message):
       val = splt[2]
       if option_valid(opt, val):
         option_set(ci, opt, val)
-        cmd_replies.add((await client.send_message(message.channel, "< option %s set to %s >" % (opt, val))).id)
+        cmd_replies.add((await message.channel.send("< option %s set to %s >" % (opt, val))).id)
       else:
-        cmd_replies.add((await client.send_message(message.channel, "< invalid option or value >")).id)
+        cmd_replies.add((await message.channel.send("< invalid option or value >")).id)
     elif (len(splt) == 2):
       opt = splt[1]
       option_unset(ci, opt)
-      await client.send_message(message.channel, "< option %s unset >" % (opt,))
+      await message.channel.send("< option %s unset >" % (opt,))
     else:
-      cmd_replies.add((await client.send_message(message.channel, "< invalid syntax, use /!set option value >")).id)
+      cmd_replies.add((await message.channel.send("< invalid syntax, use /!set option value >")).id)
       return
 
   elif txt.startswith('/!clear'):
@@ -296,7 +296,7 @@ async def on_message(message):
     print('options cache flushed')
 
   else:
-    (shld_reply, new_text) = should_reply(si, sn, ci, cn, ui, un, txt, message.server, message.channel, message.author)
+    (shld_reply, new_text) = should_reply(si, sn, ci, cn, ui, un, txt, message.guild, message.channel, message.author)
 
     if (not message.author.bot) or (len(txt) <= option_get_float(si, ci, 'max_bot_msg_length', 200, 200)):
       txt2 = new_text
@@ -305,9 +305,9 @@ async def on_message(message):
       await nn.put(str(ci), txt2)
 
     if shld_reply:
-      await client.send_typing(message.channel)
-      rpl_txt = await nn.get(str(ci))
-      rpl_msg = await client.send_message(message.channel, rpl_txt)
+      async with message.channel.typing():
+        rpl_txt = await nn.get(str(ci))
+        rpl_msg = await message.channel.send(rpl_txt)
       end_time = time()
       reply_delay = end_time - start_time
       if reply_delay > 20:
