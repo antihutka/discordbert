@@ -25,7 +25,7 @@ SELECT * FROM (
          message_count,
          (message_count - last_count) as new_messages,
          age,
-         CAST((100 * (message_count - last_count))/(100+message_count) + age / (1440 * 7)  AS DOUBLE) AS score,
+         CAST((100 * (message_count - last_count))/(100+message_count) + age / (1440 * 7) - (message_count / 100000) AS DOUBLE) AS score,
          COALESCE(uniqueness, -1) AS uniqueness,
          (SELECT COALESCE(CONCAT(server_name, "/", channel_name), user_name) FROM chat WHERE chat.channel_id = a.channel_id AND user_id NOT IN (SELECT id FROM bots) ORDER BY id DESC LIMIT 1) as chatname
   FROM (
