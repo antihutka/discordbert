@@ -122,7 +122,7 @@ def serveridname(server):
 
 def channelidname(channel):
   if channel:
-    return (channel.id, channel.name)
+    return (channel.id, channel.name if hasattr(channel,'name') else None)
   else:
     return (None, None)
 
