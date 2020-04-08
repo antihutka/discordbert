@@ -11,7 +11,7 @@ import concurrent.futures
 from httpnn import HTTPNN
 
 from sobutils.configuration import Config
-from sobutils.database import get_dbcon
+from sobutils.database import with_cursor
 
 Config.read(sys.argv[1])
 
@@ -22,46 +22,38 @@ asyncio.get_event_loop().run_until_complete(nn.initialize())
 
 bots_logged = set()
 
-def log_chat(si, sn, ci, cn, ui, un, message, is_bot):
-  db, cur = get_dbcon()
+@with_cursor
+def log_chat(cur, si, sn, ci, cn, ui, un, message, is_bot):
   cur.execute("INSERT INTO `chat` (`server_id`, `server_name`, `channel_id`, `channel_name`, `user_id`, `user_name`, `message`) VALUES (%s, %s, %s, %s, %s, %s, %s)", (si, sn, ci, cn, ui, un, message))
   if is_bot and ui not in bots_logged:
     cur.execute("INSERT INTO `bots` (`id`) VALUES (%s) ON DUPLICATE KEY UPDATE id=id", (ui,))
     bots_logged.add(ui)
-  db.commit()
-  db.close()
 
 mentions_logged = set()
-def log_mention(uid, name, mention):
+@with_cursor
+def log_mention(cur, uid, name, mention):
   if (name, mention) in mentions_logged:
     return
-  db, cur = get_dbcon()
   cur.execute("INSERT INTO `mentions` (`user_id`, `name`, `mention`) VALUES (%s, %s, %s) ON DUPLICATE KEY UPDATE counter = counter + 1", (uid, name, mention))
-  db.commit()
-  db.close()
   mentions_logged.add((name, mention))
 
 options = {}
 
-def option_set(convid, option, value):
-  db, cur = get_dbcon()
+@with_cursor
+def option_set(cur, convid, option, value):
   cur.execute("REPLACE INTO `options` (`convid`, `option`, `value`) VALUES (%s,%s, %s)", (convid, option, str(value)))
-  db.commit()
-  db.close()
   options[(convid, option)] = value
 
-def option_unset(convid, option):
-  db, cur = get_dbcon()
+@with_cursor
+def option_unset(cur, convid, option):
   cur.execute("DELETE FROM `options` WHERE `convid`=%s AND `option` = %s", (convid, option))
-  db.commit()
-  db.close()
   options[(convid, option)] = None
 
-def option_get_raw(convid, option):
+@with_cursor
+def option_get_raw(cur, convid, option):
   if (convid, option) in options:
     return options[(convid, option)]
   print('raw getting option %s %s' % (convid, option))
-  db, cur = get_dbcon()
   cur.execute("SELECT `value` FROM `options` WHERE `convid` = %s AND `option` = %s", (convid, option))
   row = cur.fetchone()
   if row != None:
