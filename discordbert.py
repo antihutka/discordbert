@@ -9,6 +9,8 @@ import re
 from random import uniform
 import concurrent.futures
 from httpnn import HTTPNN
+from cachetools import cached, LRUCache
+from cachetools.keys import hashkey
 
 from sobutils.configuration import Config
 from sobutils.database import with_cursor
@@ -29,38 +31,32 @@ def log_chat(cur, si, sn, ci, cn, ui, un, message, is_bot):
     cur.execute("INSERT INTO `bots` (`id`) VALUES (%s) ON DUPLICATE KEY UPDATE id=id", (ui,))
     bots_logged.add(ui)
 
-mentions_logged = set()
+@cached(LRUCache(8*1024))
 @with_cursor
 def log_mention(cur, uid, name, mention):
-  if (name, mention) in mentions_logged:
-    return
   cur.execute("INSERT INTO `mentions` (`user_id`, `name`, `mention`) VALUES (%s, %s, %s) ON DUPLICATE KEY UPDATE counter = counter + 1", (uid, name, mention))
-  mentions_logged.add((name, mention))
 
-options = {}
+optioncache = LRUCache(8*1024)
 
 @with_cursor
 def option_set(cur, convid, option, value):
   cur.execute("REPLACE INTO `options` (`convid`, `option`, `value`) VALUES (%s,%s, %s)", (convid, option, str(value)))
-  options[(convid, option)] = value
+  del optioncache[hashkey(convid,option)]
 
 @with_cursor
 def option_unset(cur, convid, option):
   cur.execute("DELETE FROM `options` WHERE `convid`=%s AND `option` = %s", (convid, option))
-  options[(convid, option)] = None
+  del optioncache[hashkey(convid,option)]
 
+@cached(optioncache)
 @with_cursor
 def option_get_raw(cur, convid, option):
-  if (convid, option) in options:
-    return options[(convid, option)]
   print('raw getting option %s %s' % (convid, option))
   cur.execute("SELECT `value` FROM `options` WHERE `convid` = %s AND `option` = %s", (convid, option))
   row = cur.fetchone()
   if row != None:
-    options[(convid, option)] = row[0]
     return row[0]
   else:
-    options[(convid, option)] = None
     return None
 
 def option_get_float(serverid, convid, option, def_u, def_g):
