@@ -289,9 +289,13 @@ async def on_message(message):
     if (not message.author.bot) or (len(txt) <= option_get_float(si, ci, 'max_bot_msg_length', 200, 200)):
       txt2 = new_text
       for u in message.mentions:
-        txt2 = txt2.replace(u.mention, u.name)
+        txt2 = txt2.replace(u.mention, '@'+u.name)
       for r in message.role_mentions:
-        txt2 = txt2.replace(r.mention, r.name)
+        txt2 = txt2.replace(r.mention, '@'+r.name)
+      for c in message.channel_mentions:
+        txt2 = txt2.replace(c.mention, '#'+c.name)
+      if txt2 != new_text:
+        print(" interpreted as %s" % txt2)
       await nn.put(str(ci), txt2)
 
     if shld_reply:
