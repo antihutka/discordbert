@@ -307,6 +307,9 @@ async def on_message(message):
     if shld_reply:
       async with message.channel.typing():
         rpl_txt = await nn.get(str(ci))
+        if rpl_txt == '':
+          print('ignoring empty reply')
+          return
         rpl_msg = await message.channel.send(rpl_txt)
       end_time = time()
       reply_delay = end_time - start_time
