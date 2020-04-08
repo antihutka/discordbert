@@ -36,6 +36,11 @@ def log_chat(cur, si, sn, ci, cn, ui, un, message, is_bot):
 def log_mention(cur, uid, name, mention):
   cur.execute("INSERT INTO `mentions` (`user_id`, `name`, `mention`) VALUES (%s, %s, %s) ON DUPLICATE KEY UPDATE counter = counter + 1", (uid, name, mention))
 
+@cached(LRUCache(8*1024))
+@with_cursor
+def log_role(cur, server_id, role_id, role_name, role_mention):
+  cur.execute("INSERT INTO `roles` (`server_id`, `role_id`, `role_name`, `role_mention`) VALUES (%s, %s, %s, %s) ON DUPLICATE KEY UPDATE counter = counter + 1", (server_id, role_id, role_name, role_mention))
+
 optioncache = LRUCache(8*1024)
 
 @with_cursor
@@ -235,6 +240,8 @@ async def on_message(message):
   await asyncio.get_event_loop().run_in_executor(logexec, lambda: log_chat(si, sn, ci, cn, ui, un, txt, message.author.bot))
   for u in message.mentions:
     await asyncio.get_event_loop().run_in_executor(logexec, lambda: log_mention(u.id, u.name, u.mention))
+  for r in message.role_mentions:
+    await asyncio.get_event_loop().run_in_executor(logexec, lambda: log_role(si, r.id, r.name, r.mention))
 
   if not cansend:
     return
@@ -283,6 +290,8 @@ async def on_message(message):
       txt2 = new_text
       for u in message.mentions:
         txt2 = txt2.replace(u.mention, u.name)
+      for r in message.role_mentions:
+        txt2 = txt2.replace(r.mention, r.name)
       await nn.put(str(ci), txt2)
 
     if shld_reply:
