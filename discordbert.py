@@ -1,7 +1,6 @@
 import discord
 import asyncio
 import logging
-import MySQLdb
 import socket
 import sys
 import traceback
@@ -12,6 +11,7 @@ import concurrent.futures
 from httpnn import HTTPNN
 
 from sobutils.configuration import Config
+from sobutils.database import get_dbcon
 
 Config.read(sys.argv[1])
 
@@ -19,13 +19,6 @@ logging.basicConfig(level=logging.INFO)
 
 nn = HTTPNN(Config.get('Backend', 'Url'), Config.get('Backend', 'Keyprefix'))
 asyncio.get_event_loop().run_until_complete(nn.initialize())
-
-def get_dbcon():
-  db = MySQLdb.connect(host=Config.get('Database', 'Host'), user=Config.get('Database', 'User'), passwd=Config.get('Database', 'Password'), db=Config.get('Database', 'Database'), charset='utf8')
-  cur = db.cursor()
-  cur.execute('SET NAMES utf8mb4')
-  return db, cur
-
 
 bots_logged = set()
 
