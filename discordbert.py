@@ -1,7 +1,6 @@
 import discord
 import asyncio
 import logging
-from configparser import ConfigParser
 import MySQLdb
 import socket
 import sys
@@ -12,7 +11,8 @@ from random import uniform
 import concurrent.futures
 from httpnn import HTTPNN
 
-Config = ConfigParser()
+from sobutils.configuration import Config
+
 Config.read(sys.argv[1])
 
 logging.basicConfig(level=logging.INFO)
