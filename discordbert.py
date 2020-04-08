@@ -7,13 +7,15 @@ import traceback
 from time import time, sleep
 import re
 from random import uniform
-import concurrent.futures
 from httpnn import HTTPNN
+from queue import Queue
 from cachetools import cached, LRUCache
 from cachetools.keys import hashkey
 
 from sobutils.configuration import Config
 from sobutils.database import with_cursor
+from sobutils.threads import start_thread
+from sobutils.util import inqueue
 
 Config.read(sys.argv[1])
 
@@ -22,8 +24,11 @@ logging.basicConfig(level=logging.INFO)
 nn = HTTPNN(Config.get('Backend', 'Url'), Config.get('Backend', 'Keyprefix'))
 asyncio.get_event_loop().run_until_complete(nn.initialize())
 
-bots_logged = set()
+logqueue = Queue()
+start_thread(args=(logqueue, 'dblogger'))
 
+bots_logged = set()
+@inqueue(logqueue)
 @with_cursor
 def log_chat(cur, si, sn, ci, cn, ui, un, message, is_bot):
   cur.execute("INSERT INTO `chat` (`server_id`, `server_name`, `channel_id`, `channel_name`, `user_id`, `user_name`, `message`) VALUES (%s, %s, %s, %s, %s, %s, %s)", (si, sn, ci, cn, ui, un, message))
@@ -31,11 +36,13 @@ def log_chat(cur, si, sn, ci, cn, ui, un, message, is_bot):
     cur.execute("INSERT INTO `bots` (`id`) VALUES (%s) ON DUPLICATE KEY UPDATE id=id", (ui,))
     bots_logged.add(ui)
 
+@inqueue(logqueue)
 @cached(LRUCache(8*1024))
 @with_cursor
 def log_mention(cur, uid, name, mention):
   cur.execute("INSERT INTO `mentions` (`user_id`, `name`, `mention`) VALUES (%s, %s, %s) ON DUPLICATE KEY UPDATE counter = counter + 1", (uid, name, mention))
 
+@inqueue(logqueue)
 @cached(LRUCache(8*1024))
 @with_cursor
 def log_role(cur, server_id, role_id, role_name, role_mention):
@@ -201,8 +208,6 @@ def make_help():
 
 cmd_replies = set()
 
-logexec = concurrent.futures.ThreadPoolExecutor(max_workers=1)
-
 @client.event
 async def on_message(message):
   start_time = time()
@@ -237,11 +242,13 @@ async def on_message(message):
   if message.id in cmd_replies:
     print('(not logging)')
     return
-  await asyncio.get_event_loop().run_in_executor(logexec, lambda: log_chat(si, sn, ci, cn, ui, un, txt, message.author.bot))
+  log_chat(si, sn, ci, cn, ui, un, txt, message.author.bot)
   for u in message.mentions:
-    await asyncio.get_event_loop().run_in_executor(logexec, lambda: log_mention(u.id, u.name, u.mention))
+    log_mention(u.id, u.name, u.mention)
   for r in message.role_mentions:
-    await asyncio.get_event_loop().run_in_executor(logexec, lambda: log_role(si, r.id, r.name, r.mention))
+    log_role(si, r.id, r.name, r.mention)
+#  for c in message.channel_mentions:
+#    await asyncio.get_event_loop().run_in_executor(logexec, lambda: log_channel(si, c.id, c.name, c.mention))
 
   if not cansend:
     return
