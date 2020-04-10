@@ -41,11 +41,11 @@ def log_channel(cur, channel):
     res = cur.fetchall()
     if res:
       infoid = res[0][0]
-      print('Known channel %d' % infoid)
+      print('Known channel %s %d' % (key, infoid))
     else:
       cur.execute("INSERT INTO channelinfo (channel_id, channel_name, server_id) VALUES (%s, %s, %s)", key)
       infoid = cur.lastrowid
-      print('New channel %d' % infoid)
+      print('New channel %s %d' % (key, infoid))
   cache_on_commit(cur, channelinfo_cache, key, infoid)
   if (cid not in channelinfo_current) or (channelinfo_current[cid] != infoid):
     print('Updating current channelinfo %d->%d' % (cid, infoid))
@@ -53,11 +53,39 @@ def log_channel(cur, channel):
     cache_on_commit(cur, channelinfo_current, cid, infoid)
   return infoid
 
+userinfo_cache = {}
+userinfo_current = {}
+def log_user(cur, user):
+  uid = user.id
+  uname = user.name
+  unick = getattr(user, 'nick', None)
+  ubot = user.bot
+  key = (uid, uname, unick, ubot)
+  if key in userinfo_cache:
+    infoid = userinfo_cache[key]
+  else:
+    cur.execute("SELECT userinfo_id FROM userinfo WHERE user_id = %s AND user_name = %s AND user_nick <=> %s AND is_bot = %s LIMIT 1", key)
+    res = cur.fetchall()
+    if res:
+      infoid = res[0][0]
+      print('Known user %s %d' % (key, infoid))
+    else:
+      cur.execute("INSERT INTO userinfo (user_id, user_name, user_nick, is_bot) VALUES (%s, %s, %s, %s)", key)
+      infoid = cur.lastrowid
+      print('New user %s %d' % (key, infoid))
+  cache_on_commit(cur, userinfo_cache, key, infoid)
+  if (uid not in userinfo_current) or (userinfo_current[uid] != infoid):
+    print('Updating current userinfo %d->%d' % (uid, infoid))
+    cur.execute("REPLACE INTO userinfo_current(user_id, userinfo_id) VALUES (%s, %s)", (uid, infoid))
+    cache_on_commit(cur, userinfo_current, uid, infoid)
+  return infoid
+
 bots_logged = set()
 @inqueue(logqueue)
 @with_cursor
 def log_chat(cur, message, si, sn, ci, cn, ui, un, message_text, is_bot):
   chanid = log_channel(cur, message.channel)
+  userid = log_user(cur, message.author)
   for ch in message.channel_mentions:
     log_channel(cur, ch)
   cur.execute("INSERT INTO `chat` (`server_id`, `server_name`, `channel_id`, `channel_name`, `user_id`, `user_name`, `message`) VALUES (%s, %s, %s, %s, %s, %s, %s)", (si, sn, ci, cn, ui, un, message_text))
