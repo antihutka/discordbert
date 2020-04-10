@@ -13,7 +13,7 @@ from cachetools import cached, LRUCache
 from cachetools.keys import hashkey
 
 from sobutils.configuration import Config
-from sobutils.database import with_cursor
+from sobutils.database import with_cursor, cache_on_commit
 from sobutils.threads import start_thread
 from sobutils.util import inqueue
 
@@ -27,11 +27,40 @@ asyncio.get_event_loop().run_until_complete(nn.initialize())
 logqueue = Queue()
 start_thread(args=(logqueue, 'dblogger'))
 
+channelinfo_cache = {}
+channelinfo_current = {}
+def log_channel(cur, channel):
+  cid = channel.id
+  cname = getattr(channel, 'name', None)
+  cserver = channel.guild.id if hasattr(channel, 'guild') else None
+  key = (cid, cname, cserver)
+  if key in channelinfo_cache:
+    infoid = channelinfo_cache[key]
+  else:
+    cur.execute("SELECT channelinfo_id FROM channelinfo WHERE channel_id = %s AND channel_name <=> %s AND server_id <=> %s LIMIT 1", key)
+    res = cur.fetchall()
+    if res:
+      infoid = res[0][0]
+      print('Known channel %d' % infoid)
+    else:
+      cur.execute("INSERT INTO channelinfo (channel_id, channel_name, server_id) VALUES (%s, %s, %s)", key)
+      infoid = cur.lastrowid
+      print('New channel %d' % infoid)
+  cache_on_commit(cur, channelinfo_cache, key, infoid)
+  if (cid not in channelinfo_current) or (channelinfo_current[cid] != infoid):
+    print('Updating current channelinfo %d->%d' % (cid, infoid))
+    cur.execute("REPLACE INTO channelinfo_current(channel_id, channelinfo_id) VALUES (%s, %s)", (cid, infoid))
+    cache_on_commit(cur, channelinfo_current, cid, infoid)
+  return infoid
+
 bots_logged = set()
 @inqueue(logqueue)
 @with_cursor
-def log_chat(cur, si, sn, ci, cn, ui, un, message, is_bot):
-  cur.execute("INSERT INTO `chat` (`server_id`, `server_name`, `channel_id`, `channel_name`, `user_id`, `user_name`, `message`) VALUES (%s, %s, %s, %s, %s, %s, %s)", (si, sn, ci, cn, ui, un, message))
+def log_chat(cur, message, si, sn, ci, cn, ui, un, message_text, is_bot):
+  chanid = log_channel(cur, message.channel)
+  for ch in message.channel_mentions:
+    log_channel(cur, ch)
+  cur.execute("INSERT INTO `chat` (`server_id`, `server_name`, `channel_id`, `channel_name`, `user_id`, `user_name`, `message`) VALUES (%s, %s, %s, %s, %s, %s, %s)", (si, sn, ci, cn, ui, un, message_text))
   if is_bot and ui not in bots_logged:
     cur.execute("INSERT INTO `bots` (`id`) VALUES (%s) ON DUPLICATE KEY UPDATE id=id", (ui,))
     bots_logged.add(ui)
@@ -242,7 +271,7 @@ async def on_message(message):
   if message.id in cmd_replies:
     print('(not logging)')
     return
-  log_chat(si, sn, ci, cn, ui, un, txt, message.author.bot)
+  log_chat(message, si, sn, ci, cn, ui, un, txt, message.author.bot)
   for u in message.mentions:
     log_mention(u.id, u.name, u.mention)
   for r in message.role_mentions:
