@@ -80,12 +80,40 @@ def log_user(cur, user):
     cache_on_commit(cur, userinfo_current, uid, infoid)
   return infoid
 
+serverinfo_cache = {}
+serverinfo_current = {}
+def log_server(cur, server):
+  if not server:
+    return None
+  sid = server.id
+  sname = server.name
+  key = (sid, sname)
+  if key in serverinfo_cache:
+    infoid = serverinfo_cache[key]
+  else:
+    cur.execute("SELECT serverinfo_id FROM serverinfo WHERE server_id = %s AND server_name = %s LIMIT 1", key)
+    res = cur.fetchall()
+    if res:
+      infoid = res[0][0]
+      print('Known server %s %d' % (key, infoid))
+    else:
+      cur.execute("INSERT INTO serverinfo (server_id, server_name) VALUES (%s, %s)", key)
+      infoid = cur.lastrowid
+      print('New server %s %d' % (key, infoid))
+  cache_on_commit(cur, serverinfo_cache, key, infoid)
+  if (sid not in serverinfo_current) or (serverinfo_current[sid] != infoid):
+    print('Updating current serverinfo %d->%d' % (sid, infoid))
+    cur.execute("REPLACE INTO serverinfo_current(server_id, serverinfo_id) VALUES (%s, %s)", (sid, infoid))
+    cache_on_commit(cur, serverinfo_current, sid, infoid)
+  return infoid
+
 bots_logged = set()
 @inqueue(logqueue)
 @with_cursor
 def log_chat(cur, message, si, sn, ci, cn, ui, un, message_text, is_bot):
   chanid = log_channel(cur, message.channel)
   userid = log_user(cur, message.author)
+  serverid = log_server(cur, message.guild)
   for ch in message.channel_mentions:
     log_channel(cur, ch)
   cur.execute("INSERT INTO `chat` (`server_id`, `server_name`, `channel_id`, `channel_name`, `user_id`, `user_name`, `message`) VALUES (%s, %s, %s, %s, %s, %s, %s)", (si, sn, ci, cn, ui, un, message_text))
