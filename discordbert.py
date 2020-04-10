@@ -382,6 +382,7 @@ async def on_message(message):
       txt2 = new_text
       for u in message.mentions:
         txt2 = txt2.replace(u.mention, '@'+u.name)
+        txt2 = txt2.replace('<@!%d>'%u.id, '@'+u.name)
       for r in message.role_mentions:
         txt2 = txt2.replace(r.mention, '@'+r.name)
       for c in message.channel_mentions:
