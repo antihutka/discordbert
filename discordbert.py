@@ -376,6 +376,11 @@ async def on_message(message):
     print('options cache flushed')
 
   else:
+    queued = await nn.queued_for_key(str(ci))
+    if queued > 32:
+      print('Dropping message, %d messages queued' % queued)
+      return
+
     (shld_reply, new_text) = should_reply(si, sn, ci, cn, ui, un, txt, message.guild, message.channel, message.author)
 
     if (not message.author.bot) or (len(txt) <= option_get_float(si, ci, 'max_bot_msg_length', 200, 200)):
