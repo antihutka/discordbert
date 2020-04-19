@@ -293,6 +293,8 @@ def make_help():
 
 cmd_replies = set()
 
+currently_sending = {}
+
 @client.event
 async def on_message(message):
   start_time = time()
@@ -396,13 +398,23 @@ async def on_message(message):
         print(" interpreted as %s" % txt2)
       await nn.put(str(ci), txt2)
 
+    
     if shld_reply:
-      async with message.channel.typing():
-        rpl_txt = await nn.get(str(ci))
-        if rpl_txt == '':
-          print('ignoring empty reply')
-          return
-        rpl_msg = await message.channel.send(rpl_txt)
+      if ci not in currently_sending:
+        currently_sending[ci] = 0
+      if currently_sending[ci] > 8:
+        print('%d messages being sent, not responding' % currently_sending[ci])
+        return
+      currently_sending[ci] += 1
+      try:
+        async with message.channel.typing():
+          rpl_txt = await nn.get(str(ci))
+          if rpl_txt == '':
+            print('ignoring empty reply')
+            return
+          rpl_msg = await message.channel.send(rpl_txt)
+      finally:
+        currently_sending[ci] -= 1
       end_time = time()
       reply_delay = end_time - start_time
       if reply_delay > 20:
