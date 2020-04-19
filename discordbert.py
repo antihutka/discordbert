@@ -116,7 +116,7 @@ def log_chat(cur, message, si, sn, ci, cn, ui, un, message_text, is_bot):
   serverid = log_server(cur, message.guild)
   for ch in message.channel_mentions:
     log_channel(cur, ch)
-  cur.execute("INSERT INTO `chat` (`server_id`, `server_name`, `channel_id`, `channel_name`, `user_id`, `user_name`, `message`) VALUES (%s, %s, %s, %s, %s, %s, %s)", (si, sn, ci, cn, ui, un, message_text))
+  cur.execute("INSERT INTO `chat` (`server_id`, `serverinfo_id`, `server_name`, `channel_id`, `channelinfo_id`, `channel_name`, `user_id`, `userinfo_id`, `user_name`, `message`) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)", (si, serverid, sn, ci, chanid, cn, ui, userid, un, message_text))
   if is_bot and ui not in bots_logged:
     cur.execute("INSERT INTO `bots` (`id`) VALUES (%s) ON DUPLICATE KEY UPDATE id=id", (ui,))
     bots_logged.add(ui)
