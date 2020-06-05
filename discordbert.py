@@ -138,12 +138,12 @@ optioncache = LRUCache(8*1024)
 @with_cursor
 def option_set(cur, convid, option, value):
   cur.execute("REPLACE INTO `options` (`convid`, `option`, `value`) VALUES (%s,%s, %s)", (convid, option, str(value)))
-  del optioncache[hashkey(convid,option)]
+  optioncache.pop(hashkey(convid,option), None)
 
 @with_cursor
 def option_unset(cur, convid, option):
   cur.execute("DELETE FROM `options` WHERE `convid`=%s AND `option` = %s", (convid, option))
-  del optioncache[hashkey(convid,option)]
+  optioncache.pop(hashkey(convid,option), None)
 
 @cached(optioncache)
 @with_cursor
@@ -179,6 +179,25 @@ def option_get_string(serverid, convid, option, def_u, def_g):
     return def_g
   else:
     return def_u
+
+badwordcache = LRUCache(8*1024)
+
+@cached(badwordcache)
+@with_cursor
+def badword_get(cur, server_id):
+  print('getting badwords for %d' % server_id)
+  cur.execute("SELECT badword FROM badwords WHERE server_id=%s", (server_id,))
+  return [x[0] for x in cur]
+
+@with_cursor
+def badword_add(cur, server_id, badword, addedby):
+  cur.execute("INSERT INTO badwords (server_id, badword, addedby) VALUES (%s, %s, %s)", (server_id, badword, addedby))
+  badwordcache.pop(hashkey(server_id), None)
+
+@with_cursor
+def badword_del(cur, server_id, badword):
+  cur.execute("DELETE FROM badwords WHERE server_id = %s AND badword = %s", (server_id, badword))
+  badwordcache.pop(hashkey(server_id), None)
 
 client = discord.Client()
 
@@ -280,12 +299,13 @@ help_links="""[Add me to your server](https://discordapp.com/oauth2/authorize?cl
 def make_help():
   emb = discord.Embed(description="Sobert's silly help thing")
   emb.add_field(name="/!help", value="Show this text")
-  emb.add_field(name="/!set reply_prob **P**", value="Set my reply probability for the current channel to **P** (0 to 1.0). Defaults to 0, except in DMs.")
-  emb.add_field(name="/!set max_bot_msg_length **L**", value="Don't process messages from bots longer than **L** characters. Defaults to 200.")
-  emb.add_field(name="/!set prefix_only **0|1**", value="Only match keywords as prefixes, not anywhere in the message.")
-  emb.add_field(name="/!set mention_only **0|1**", value="Don't match on name, only @mention.")
-  emb.add_field(name="/!set extra_prefix **P**", value="Set an additional prefix to reply to")
-  emb.add_field(name="/!set **option_name**", value="Unsets a previously set option")
+  emb.add_field(name="/!set reply_prob *P*", value="Set my reply probability for the current channel to **P** (0 to 1.0). Defaults to 0, except in DMs.")
+  emb.add_field(name="/!set max_bot_msg_length *L*", value="Don't process messages from bots longer than **L** characters. Defaults to 200.")
+  emb.add_field(name="/!set prefix_only *0|1*", value="Only match keywords as prefixes, not anywhere in the message.")
+  emb.add_field(name="/!set mention_only *0|1*", value="Don't match on name, only @mention.")
+  emb.add_field(name="/!set extra_prefix *P*", value="Set an additional prefix to reply to")
+  emb.add_field(name="/!set *option_name*", value="Unsets a previously set option")
+  emb.add_field(name="/!badword *word*", value="Add or remove word to/from per-server bad word list")
   emb.add_field(name="Links and stuff", value=help_links)
   return emb
 
@@ -377,6 +397,24 @@ async def on_message(message):
     options.clear()
     print('options cache flushed')
 
+  elif txt.startswith('/!badword '):
+    if message.guild and not message.author.permissions_in(message.channel).manage_channels:
+      await message.channel.send("< only people with manage_channels permission can change badwords >")
+      return
+    splt = txt.split(' ', 1)
+    bw = splt[1]
+    bws = badword_get(si or ci)
+    if bw in bws:
+      badword_del(si or ci, bw)
+      await message.channel.send("< badword %s deleted >" % (bw))
+    else:
+      badword_add(si or ci, bw, ui)
+      await message.channel.send("< badword %s added >" % (bw))
+
+  elif txt == '/!badword':
+    bws = badword_get(si or ci)
+    await message.channel.send("< badwords: %s >" % repr(bws))
+
   else:
     queued = await nn.queued_for_key(str(ci))
     if queued > 32:
@@ -408,7 +446,7 @@ async def on_message(message):
       currently_sending[ci] += 1
       try:
         async with message.channel.typing():
-          rpl_txt = await nn.get(str(ci))
+          rpl_txt = await nn.get(str(ci), bad_words = badword_get(si or ci))
           if rpl_txt == '':
             print('ignoring empty reply')
             return
