@@ -27,15 +27,21 @@ SELECT * FROM (
          age,
          CAST((100 * (message_count - last_count))/(100+message_count) + age / (1440 * 7) - (message_count / 100000) AS DOUBLE) AS score,
          COALESCE(uniqueness, -1) AS uniqueness,
-         (SELECT COALESCE(CONCAT(server_name, "/", channel_name), user_name) FROM chat WHERE chat.channel_id = a.channel_id AND user_id NOT IN (SELECT id FROM bots) ORDER BY id DESC LIMIT 1) as chatname
+         COALESCE(CONCAT(server_name, "/", channel_name), (SELECT user_name FROM chat_counters LEFT JOIN userinfo_current USING (user_id) LEFT JOIN userinfo USING (user_id, userinfo_id) WHERE chat_counters.channel_id=a.channel_id AND user_id NOT IN (SELECT id FROM bots))
+         ) AS chatname
   FROM (
     SELECT channel_id,
            message_count,
            last_count,
            TIMESTAMPDIFF(MINUTE, last_update, CURRENT_TIMESTAMP) AS age,
            uniqueness
-    FROM chat_uniqueness LEFT JOIN channel_counts_nobots USING (channel_id)
+    FROM chat_uniqueness 
+      LEFT JOIN channel_counts_nobots USING (channel_id)
   ) a
+    LEFT JOIN channelinfo_current USING (channel_id)
+    LEFT JOIN channelinfo USING (channelinfo_id, channel_id)
+    LEFT JOIN serverinfo_current USING (server_id)
+    LEFT JOIN serverinfo USING (server_id, serverinfo_id)
 ) b WHERE score > 0.1 OR uniqueness < 0 ORDER BY score DESC LIMIT 10;
 """
 
