@@ -1,4 +1,5 @@
 import time
+from tabulate import tabulate
 
 from botlib.util import aretry
 from botlib.configuration import Config, read_config
@@ -78,8 +79,7 @@ def update_step(cur):
   if not chats_to_update:
     print("No chats to update")
     return 0
-  for i in chats_to_update:
-    print("Chat: %16d New: %6d / %6d updated: %6d minutes ago score: %4.2f bad: %d uniq: %.3f %s" % i)
+  print(tabulate(chats_to_update, headers=['channel_id', 'msg', 'newmsg', 'lastupd', 'score', 'is_bad', 'uniq', 'chat_name']))
   (channel_id, msg_count, msg_new, age, score, is_bad, uniq, chatname) = chats_to_update[0]
   server_id = get_server_for_channel(cur, channel_id)
   print("Updating stats for %s %d %s" % (server_id, channel_id, chatname))
