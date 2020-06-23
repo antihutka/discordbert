@@ -26,6 +26,7 @@ SELECT * FROM (
          (message_count - last_count) as new_messages,
          age,
          CAST((100 * (message_count - last_count))/(100+message_count) + age / (1440 * 7) - (message_count / 100000) AS DOUBLE) AS score,
+         channel_id IN (SELECT id FROM _bad_channels) AS is_bad,
          COALESCE(uniqueness, -1) AS uniqueness,
          COALESCE(CONCAT(server_name, "/", channel_name), (SELECT user_name FROM chat_counters LEFT JOIN userinfo_current USING (user_id) LEFT JOIN userinfo USING (user_id, userinfo_id) WHERE chat_counters.channel_id=a.channel_id AND user_id NOT IN (SELECT id FROM bots))
          ) AS chatname
@@ -67,6 +68,10 @@ def write_score(cur, channel_id, uniq, cnt):
               "  last_update = CURRENT_TIMESTAMP "
               "WHERE channel_id = %s", (uniq, cnt, channel_id))
 
+badchannels = Config.get('UpdateUniq', 'Badchannels')
+badchannels = [x.strip() for x in badchannels.split(',')]
+print(badchannels)
+
 @with_cursor
 def update_step(cur):
   chats_to_update = get_scores(cur)
@@ -74,16 +79,19 @@ def update_step(cur):
     print("No chats to update")
     return 0
   for i in chats_to_update:
-    print("Chat: %16d New: %6d / %6d updated: %6d minutes ago score: %4.2f uniq: %.3f %s" % i)
-  (channel_id, msg_count, msg_new, age, score, uniq, chatname) = chats_to_update[0]
+    print("Chat: %16d New: %6d / %6d updated: %6d minutes ago score: %4.2f bad: %d uniq: %.3f %s" % i)
+  (channel_id, msg_count, msg_new, age, score, is_bad, uniq, chatname) = chats_to_update[0]
   server_id = get_server_for_channel(cur, channel_id)
   print("Updating stats for %s %d %s" % (server_id, channel_id, chatname))
   new_uniq = get_score(cur, server_id, channel_id)
   print("Changed uniq from %f to %f (%f)" % (uniq, new_uniq, float(new_uniq)-float(uniq)))
   write_score(cur, channel_id, new_uniq, msg_count)
+  if any((bw in chatname for bw in badchannels)):
+    print("Chat name contains bad channel name")
   return score
 
 varsleep = 300
+
 
 while True:
   starttime = time.time()
