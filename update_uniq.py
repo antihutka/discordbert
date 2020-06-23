@@ -29,6 +29,7 @@ SELECT * FROM (
          CAST((100 * (message_count - last_count))/(100+message_count) + age / (1440 * 7) - (message_count / 100000) AS DOUBLE) AS score,
          channel_id IN (SELECT id FROM _bad_channels) AS is_bad,
          COALESCE(uniqueness, -1) AS uniqueness,
+         goodness, badness,
          COALESCE(CONCAT(server_name, "/", channel_name), (SELECT user_name FROM chat_counters LEFT JOIN userinfo_current USING (user_id) LEFT JOIN userinfo USING (user_id, userinfo_id) WHERE chat_counters.channel_id=a.channel_id AND user_id NOT IN (SELECT id FROM bots))
          ) AS chatname
   FROM (
@@ -36,8 +37,9 @@ SELECT * FROM (
            message_count,
            last_count,
            TIMESTAMPDIFF(MINUTE, last_update, CURRENT_TIMESTAMP) AS age,
-           uniqueness
-    FROM chat_uniqueness 
+           uniqueness,
+           goodness, badness
+    FROM chat_uniqueness
       LEFT JOIN channel_counts_nobots USING (channel_id)
   ) a
     LEFT JOIN channelinfo_current USING (channel_id)
@@ -56,18 +58,24 @@ def get_server_for_channel(cur, channel_id):
   return cur.fetchone()[0]
 
 def get_score(cur, server_id, channel_id):
-  cur.execute("SELECT COALESCE(SUM(IF(count=1, 1, 0)) / COUNT(*), 0) "
+  cur.execute("SELECT COALESCE(SUM(IF(count=1, 1, 0)) / COUNT(*), 0) AS quality, "
+              "       SUM(IF(bad_messages.hash IS NOT NULL, 1, 0)) / COUNT(*) AS badness, "
+              "       SUM(IF(good_messages.hash IS NOT NULL, 1, 0)) / COUNT(*) AS goodness "
               "  FROM chat LEFT JOIN chat_hashcounts ON hash=UNHEX(SHA2(message, 256)) "
+              "            LEFT JOIN bad_messages USING (hash) "
+              "            LEFT JOIN good_messages USING (hash) "
               "  WHERE user_id NOT IN (SELECT id FROM bots) "
               "    AND chat.server_id <=> %s AND chat.channel_id=%s", (server_id,channel_id))
-  return cur.fetchone()[0]
+  return cur.fetchone()
 
-def write_score(cur, channel_id, uniq, cnt):
+def write_score(cur, channel_id, uniq, cnt, goodness, badness):
   cur.execute("UPDATE chat_uniqueness SET "
               "  uniqueness = %s, "
               "  last_count = %s, "
+              "  goodness = %s, "
+              "  badness = %s, "
               "  last_update = CURRENT_TIMESTAMP "
-              "WHERE channel_id = %s", (uniq, cnt, channel_id))
+              "WHERE channel_id = %s", (uniq, cnt, goodness, badness, channel_id))
 
 badchannels = Config.get('UpdateUniq', 'Badchannels')
 badchannels = [x.strip() for x in badchannels.split(',')]
@@ -79,13 +87,13 @@ def update_step(cur):
   if not chats_to_update:
     print("No chats to update")
     return 0
-  print(tabulate(chats_to_update, headers=['channel_id', 'msg', 'newmsg', 'lastupd', 'score', 'is_bad', 'uniq', 'chat_name']))
-  (channel_id, msg_count, msg_new, age, score, is_bad, uniq, chatname) = chats_to_update[0]
+  print(tabulate(chats_to_update, headers=['channel_id', 'msg', 'newmsg', 'lastupd', 'score', 'is_bad', 'uniq', 'Gss', 'Bss', 'chat_name']))
+  (channel_id, msg_count, msg_new, age, score, is_bad, uniq, _goodness, _badness, chatname) = chats_to_update[0]
   server_id = get_server_for_channel(cur, channel_id)
   print("Updating stats for %s %d %s" % (server_id, channel_id, chatname))
-  new_uniq = get_score(cur, server_id, channel_id)
-  print("Changed uniq from %f to %f (%f)" % (uniq, new_uniq, float(new_uniq)-float(uniq)))
-  write_score(cur, channel_id, new_uniq, msg_count)
+  (new_uniq, badness, goodness) = get_score(cur, server_id, channel_id)
+  print("Changed uniq from %f to %f (%f) good %.3f bad %.3f" % (uniq, new_uniq, float(new_uniq)-float(uniq), goodness, badness))
+  write_score(cur, channel_id, new_uniq, msg_count, goodness, badness)
   if any((bw in chatname for bw in badchannels)):
     print("Chat name contains bad channel name")
   return score
