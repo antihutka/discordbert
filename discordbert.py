@@ -17,6 +17,8 @@ from sobutils.database import with_cursor, cache_on_commit
 from sobutils.threads import start_thread
 from sobutils.util import inqueue
 
+import options
+
 Config.read(sys.argv[1])
 
 logging.basicConfig(level=logging.INFO)
@@ -133,53 +135,6 @@ def log_mention(cur, uid, name, mention):
 def log_role(cur, server_id, role_id, role_name, role_mention):
   cur.execute("INSERT INTO `roles` (`server_id`, `role_id`, `role_name`, `role_mention`) VALUES (%s, %s, %s, %s) ON DUPLICATE KEY UPDATE counter = counter + 1", (server_id, role_id, role_name, role_mention))
 
-optioncache = LRUCache(8*1024)
-
-@with_cursor
-def option_set(cur, convid, option, value):
-  cur.execute("REPLACE INTO `options` (`convid`, `option`, `value`) VALUES (%s,%s, %s)", (convid, option, str(value)))
-  optioncache.pop(hashkey(convid,option), None)
-
-@with_cursor
-def option_unset(cur, convid, option):
-  cur.execute("DELETE FROM `options` WHERE `convid`=%s AND `option` = %s", (convid, option))
-  optioncache.pop(hashkey(convid,option), None)
-
-@cached(optioncache)
-@with_cursor
-def option_get_raw(cur, convid, option):
-  print('raw getting option %s %s' % (convid, option))
-  cur.execute("SELECT `value` FROM `options` WHERE `convid` = %s AND `option` = %s", (convid, option))
-  row = cur.fetchone()
-  if row != None:
-    return row[0]
-  else:
-    return None
-
-def option_get_float(serverid, convid, option, def_u, def_g):
-  try:
-    oraw = option_get_raw(convid, option)
-    if oraw != None:
-      return float(oraw)
-  except Exception as e:
-    print("Error getting option %s for conv %d: %s" % (option, convid, str(e)))
-  if serverid:
-    return def_g
-  else:
-    return def_u
-
-def option_get_string(serverid, convid, option, def_u, def_g):
-  try:
-    oraw = option_get_raw(convid, option)
-    if oraw != None:
-      return oraw
-  except Exception as e:
-    print("Error getting string option %s for conv %d: %s" % (option, convid, str(e)))
-  if serverid:
-    return def_g
-  else:
-    return def_u
-
 badwordcache = LRUCache(8*1024)
 
 @cached(badwordcache)
@@ -223,20 +178,6 @@ def channelidname(channel):
   else:
     return (None, None)
 
-def option_valid(o, v):
-  if o in ['reply_prob', 'max_bot_msg_length', 'mention_only', 'prefix_only']:
-    if re.match(r'^([0-9]+|[0-9]*\.[0-9]+)$', v):
-      return True
-    else:
-      return False
-  if o == 'extra_prefix':
-    if re.match(r'^\S+$', v):
-      return True
-    else:
-      return False
-  else:
-    return False
-
 def can_send(server, channel):
   if (not server) or (not channel):
     return True
@@ -244,8 +185,8 @@ def can_send(server, channel):
   return channel.permissions_for(member).send_messages
 
 def should_reply(si, sn, ci, cn, ui, un, txt, server, channel, author):
-  opt_mention_only = option_get_float(si, ci, 'mention_only', 0, 1)
-  opt_extra_prefix = option_get_string(si, ci, 'extra_prefix', "", "")
+  opt_mention_only = options.get_option(si, ci, 'mention_only')
+  opt_extra_prefix = options.get_option(si, ci, 'extra_prefix')
 
   keywords = ["<@%s>" % client.user.id, "<@!%s>" % client.user.id]
 
@@ -258,7 +199,7 @@ def should_reply(si, sn, ci, cn, ui, un, txt, server, channel, author):
     return (False, txt)
 
   # ignore bots by default
-  if author.bot and option_get_float(si, ci, 'reply_to_bots', 0, 0) == 0:
+  if author.bot and options.get_option(si, ci, 'reply_to_bots') == 0:
     return (False, txt)
 
   member = None
@@ -278,7 +219,7 @@ def should_reply(si, sn, ci, cn, ui, un, txt, server, channel, author):
       keywords.append(member.nick.lower())
 
 #  print("kw: ", keywords)
-  if option_get_float(si, ci, 'prefix_only', 0, 1) <= 0:
+  if options.get_option(si, ci, 'prefix_only') <= 0:
     for kw in keywords:
       if kw in txt.lower():
         return (True, txt)
@@ -287,7 +228,7 @@ def should_reply(si, sn, ci, cn, ui, un, txt, server, channel, author):
       if txt.lower().startswith(kw):
         return (True, txt)
 
-  prob = option_get_float(si, ci, 'reply_prob', 1, 0)
+  prob = options.get_option(si, ci, 'reply_prob')
   if (uniform(0, 1) < prob):
     return (True, txt)
   return (False, txt)
@@ -333,7 +274,7 @@ async def on_message(message):
   channel_ignored = False
   if message.author.bot:
     msgcolor = '\033[34m'
-  if option_get_float(si, ci, 'ignore_channel', 0, 0) > 0:
+  if options.get_option(si, ci, 'ignore_channel') > 0:
     channel_ignored = True
     msgcolor = '\033[90m'
   if not cansend:
@@ -380,21 +321,24 @@ async def on_message(message):
     if (len(splt) == 3):
       opt = splt[1]
       val = splt[2]
-      if option_valid(opt, val):
-        option_set(ci, opt, val)
-        cmd_replies.add((await message.channel.send("< option %s set to %s >" % (opt, val))).id)
-      else:
-        cmd_replies.add((await message.channel.send("< invalid option or value >")).id)
+      try:
+        options.set_option(ci, opt, val)
+        await message.channel.send("< option %s set to %s >" % (opt, val))
+      except options.OptionError as oe:
+        await message.channel.send("< %s >" % str(oe))
     elif (len(splt) == 2):
       opt = splt[1]
-      option_unset(ci, opt)
-      await message.channel.send("< option %s unset >" % (opt,))
+      try:
+        options.set_option(ci, opt, None)
+        await message.channel.send("< option %s unset >" % (opt,))
+      except options.OptionError as oe:
+        await message.channel.send("< %s >" % str(oe))
     else:
       cmd_replies.add((await message.channel.send("< invalid syntax, use /!set option value >")).id)
       return
 
   elif txt.startswith('/!clear'):
-    options.clear()
+    options.optioncache.clear()
     print('options cache flushed')
 
   elif txt.startswith('/!badword '):
@@ -423,7 +367,7 @@ async def on_message(message):
 
     (shld_reply, new_text) = should_reply(si, sn, ci, cn, ui, un, txt, message.guild, message.channel, message.author)
 
-    if (not message.author.bot) or (len(txt) <= option_get_float(si, ci, 'max_bot_msg_length', 200, 200)):
+    if (not message.author.bot) or (len(txt) <= options.get_option(si, ci, 'max_bot_msg_length')):
       txt2 = new_text
       for u in message.mentions:
         txt2 = txt2.replace(u.mention, '@'+u.name)
