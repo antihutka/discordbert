@@ -30,8 +30,7 @@ SELECT * FROM (
          channel_id IN (SELECT id FROM _bad_channels) AS is_bad,
          COALESCE(uniqueness, -1) AS uniqueness,
          goodness, badness,
-         COALESCE(CONCAT(server_name, "/", channel_name), (SELECT user_name FROM chat_counters LEFT JOIN userinfo_current USING (user_id) LEFT JOIN userinfo USING (user_id, userinfo_id) WHERE chat_counters.channel_id=a.channel_id AND user_id NOT IN (SELECT id FROM bots))
-         ) AS chatname
+         COALESCE(CONCAT(server_name, "/", channel_name), '<dm>') AS chatname
   FROM (
     SELECT channel_id,
            message_count,
