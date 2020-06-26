@@ -64,7 +64,7 @@ def get_score(cur, server_id, channel_id):
               "            LEFT JOIN bad_messages USING (hash) "
               "            LEFT JOIN good_messages USING (hash) "
               "  WHERE user_id NOT IN (SELECT id FROM bots) "
-              "    AND chat.server_id <=> %s AND chat.channel_id=%s", (server_id,channel_id))
+              "    AND (chat.server_id <=> %s OR chat.server_id IS NULL) AND chat.channel_id=%s", (server_id,channel_id))
   return cur.fetchone()
 
 def write_score(cur, channel_id, uniq, cnt, goodness, badness):
@@ -91,6 +91,7 @@ def update_step(cur):
   server_id = get_server_for_channel(cur, channel_id)
   print("Updating stats for %s %d %s" % (server_id, channel_id, chatname))
   (new_uniq, badness, goodness) = get_score(cur, server_id, channel_id)
+  print(uniq, new_uniq, float(new_uniq)-float(uniq), goodness, badness)
   print("Changed uniq from %f to %f (%f) good %.3f bad %.3f" % (uniq, new_uniq, float(new_uniq)-float(uniq), goodness, badness))
   write_score(cur, channel_id, new_uniq, msg_count, goodness, badness)
   if any((bw in chatname for bw in badchannels)):
