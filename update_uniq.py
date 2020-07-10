@@ -26,8 +26,8 @@ SELECT * FROM (
          message_count,
          (message_count - last_count) as new_messages,
          age,
-         CAST((100 * (message_count - last_count))/(100+message_count) + age / (1440 * 7) - (message_count / 100000) AS DOUBLE) AS score,
-         channel_id IN (SELECT id FROM _bad_channels) AS is_bad,
+         CAST((100 * (message_count - last_count))/(100+message_count) + age / (1440 * 7) - (IF(COALESCE(is_bad,0)>0, 1, 0)) - (message_count / 100000) AS DOUBLE) AS score,
+         is_bad,
          COALESCE(uniqueness, -1) AS uniqueness,
          goodness, badness,
          COALESCE(CONCAT(server_name, "/", channel_name), '<dm>') AS chatname
@@ -43,6 +43,7 @@ SELECT * FROM (
   ) a
     LEFT JOIN channelinfo_current USING (channel_id)
     LEFT JOIN channelinfo USING (channelinfo_id, channel_id)
+    LEFT JOIN options2 USING (channel_id)
     LEFT JOIN serverinfo_current USING (server_id)
     LEFT JOIN serverinfo USING (server_id, serverinfo_id)
 ) b WHERE score > 0.1 OR uniqueness < 0 ORDER BY score DESC LIMIT 10;
@@ -76,6 +77,9 @@ def write_score(cur, channel_id, uniq, cnt, goodness, badness):
               "  last_update = CURRENT_TIMESTAMP "
               "WHERE channel_id = %s", (uniq, cnt, goodness, badness, channel_id))
 
+def set_bad(cur, channel_id):
+  cur.execute("INSERT INTO options2 (channel_id, is_bad) VALUES (%s, 1) ON DUPLICATE KEY UPDATE is_bad=1", (channel_id,))
+
 badchannels = Config.get('UpdateUniq', 'Badchannels')
 badchannels = [x.strip() for x in badchannels.split(',')]
 print(badchannels)
@@ -94,6 +98,9 @@ def update_step(cur):
   print(uniq, new_uniq, float(new_uniq)-float(uniq), goodness, badness)
   print("Changed uniq from %f to %f (%f) good %.3f bad %.3f" % (uniq, new_uniq, float(new_uniq)-float(uniq), goodness, badness))
   write_score(cur, channel_id, new_uniq, msg_count, goodness, badness)
+  if not is_bad and badness > 0.1:
+    print("Marking chat as bad.")
+    set_bad(cur, channel_id)
   if any((bw in chatname for bw in badchannels)):
     print("Chat name contains bad channel name")
   return score
