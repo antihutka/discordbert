@@ -14,7 +14,8 @@ option_types = {
   'reply_to_bots' : int,
   'ignore_channel': int,
   'is_bad': int,
-  'is_hidden': int
+  'is_hidden': int,
+  'blacklisted': int
 }
 
 default_user = {
@@ -26,7 +27,8 @@ default_user = {
   'reply_to_bots' : 0,
   'ignore_channel': 0,
   'is_bad': 0,
-  'is_hidden': 0
+  'is_hidden': 0,
+  'blacklisted': 0
 }
 
 default_group = {
@@ -38,7 +40,8 @@ default_group = {
   'reply_to_bots' : 0,
   'ignore_channel': 0,
   'is_bad': 0,
-  'is_hidden': 0
+  'is_hidden': 0,
+  'blacklisted': 0
 }
 
 optioncache = TTLCache(1024, 60*60)

@@ -26,9 +26,9 @@ SELECT * FROM (
          message_count,
          (message_count - last_count) as new_messages,
          age,
-         CAST((100 * (message_count - last_count))/(100+message_count) + age / (1440 * 7) - (IF(COALESCE(ignore_channel,0)>0, 1, 0)) - (message_count / 100000) AS DOUBLE) AS score,
+         CAST((100 * (message_count - last_count))/(100+message_count) + age / (1440 * 7) - (IF(COALESCE(blacklisted,0)>0, 1, 0)) - (message_count / 100000) AS DOUBLE) AS score,
          is_bad,
-         ignore_channel,
+         blacklisted,
          COALESCE(uniqueness, -1) AS uniqueness,
          goodness, badness, botness,
          COALESCE(CONCAT(server_name, "/", channel_name), '<dm>') AS chatname
@@ -86,8 +86,8 @@ def write_score(cur, channel_id, uniq, cnt, goodness, badness, botness):
 def set_bad(cur, channel_id):
   cur.execute("INSERT INTO options2 (channel_id, is_bad) VALUES (%s, 1) ON DUPLICATE KEY UPDATE is_bad=1", (channel_id,))
 
-def set_ignore(cur, channel_id):
-  cur.execute("INSERT INTO options2 (channel_id, ignore_channel) VALUES (%s, 1) ON DUPLICATE KEY UPDATE ignore_channel=1", (channel_id,))
+def set_blacklisted(cur, channel_id):
+  cur.execute("INSERT INTO options2 (channel_id, blacklisted) VALUES (%s, 1) ON DUPLICATE KEY UPDATE blacklisted=1", (channel_id,))
 
 badchannels = Config.get('UpdateUniq', 'Badchannels')
 badchannels = [x.strip() for x in badchannels.split(',')]
@@ -99,8 +99,8 @@ def update_step(cur):
   if not chats_to_update:
     print("No chats to update")
     return 0
-  print(tabulate(chats_to_update, headers=['channel_id', 'msg', 'newmsg', 'lastupd', 'score', 'is_bad', 'ignore', 'uniq', 'Gss', 'Bss', 'Botss', 'chat_name']))
-  (channel_id, msg_count, msg_new, age, score, is_bad, is_ignored, uniq, _goodness, _badness, _botness, chatname) = chats_to_update[0]
+  print(tabulate(chats_to_update, headers=['channel_id', 'msg', 'newmsg', 'lastupd', 'score', 'is_bad', 'blacklist', 'uniq', 'Gss', 'Bss', 'Botss', 'chat_name']))
+  (channel_id, msg_count, msg_new, age, score, is_bad, is_blacklisted, uniq, _goodness, _badness, _botness, chatname) = chats_to_update[0]
   server_id = get_server_for_channel(cur, channel_id)
   print("Updating stats for %s %d %s" % (server_id, channel_id, chatname))
   (new_uniq, badness, goodness) = get_score(cur, server_id, channel_id)
@@ -110,11 +110,11 @@ def update_step(cur):
   if not is_bad and badness > 0.1:
     print("Marking chat as bad.")
     set_bad(cur, channel_id)
-  if (not is_ignored) and is_bad and (
+  if (not is_blacklisted) and is_bad and (
     (badness > 0.2 and msg_count > 500) or
     (badness > 0.5)):
-    print("Ignoring chat.")
-    set_ignore(cur, channel_id)
+    print("Blacklisting chat.")
+    set_blacklisted(cur, channel_id)
   if any((bw in chatname for bw in badchannels)):
     print("Chat name contains bad channel name")
   return score

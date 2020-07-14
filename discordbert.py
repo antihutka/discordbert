@@ -269,6 +269,9 @@ async def on_message(message):
   if txt == "":
     return
 
+  if options.get_option(si, ci, 'blacklisted') > 0:
+    return
+
   cansend = can_send(message.guild, message.channel)
 
   channel_ignored = False
@@ -295,8 +298,6 @@ async def on_message(message):
     log_mention(u.id, u.name, u.mention)
   for r in message.role_mentions:
     log_role(si, r.id, r.name, r.mention)
-#  for c in message.channel_mentions:
-#    await asyncio.get_event_loop().run_in_executor(logexec, lambda: log_channel(si, c.id, c.name, c.mention))
 
   if not cansend:
     return
