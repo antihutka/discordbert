@@ -107,10 +107,12 @@ def update_step(cur):
   botness = get_botness(cur, channel_id)
   print("Changed uniq from %f to %f (%f) good %.3f bad %.3f bot %.3f" % (uniq, new_uniq, float(new_uniq)-float(uniq), goodness, badness, botness))
   write_score(cur, channel_id, new_uniq, msg_count, goodness, badness, botness)
-  if not is_bad and badness > 0.1:
+  if (is_bad is None) and (
+    (badness > 0.1) or
+    (new_uniq < 0.1)):
     print("Marking chat as bad.")
     set_bad(cur, channel_id)
-  if (not is_blacklisted) and is_bad and (
+  if (is_blacklisted is None) and is_bad and (
     (badness > 0.2 and msg_count > 500) or
     (badness > 0.5)):
     print("Blacklisting chat.")
