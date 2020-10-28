@@ -113,8 +113,9 @@ def update_step(cur):
     print("Marking chat as bad.")
     set_bad(cur, channel_id)
   if (is_blacklisted is None) and is_bad and (
-    (badness > 0.2 and msg_count > 500) or
-    (badness > 0.5)):
+    (new_uniq < 0.01 and msg_count > 1000) or
+    (badness > 0.3 and msg_count > 500) or
+    (badness > 0.6)):
     print("Blacklisting chat.")
     set_blacklisted(cur, channel_id)
   if any((bw in chatname for bw in badchannels)):
