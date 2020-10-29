@@ -18,6 +18,16 @@ def add_new_chats(cur):
   if cur.rowcount > 0:
     print("Added %d new chats" % cur.rowcount)
 
+@with_cursor
+def add_new_bot_chats(cur):
+  cur.execute("SELECT channel_id FROM chat_counters "
+              "  WHERE channel_id NOT IN (SELECT channel_id FROM chat_uniqueness) AND user_id IN (SELECT id FROM bots) AND user_id NOT IN (SELECT id FROM good_bots) "
+              "  GROUP BY channel_id "
+              "  HAVING SUM(message_count) > 10000")
+  vals = cur.fetchall()
+  cur.executemany("INSERT INTO chat_uniqueness(channel_id) VALUES (%s)", vals)
+  if cur.rowcount > 0:
+    print("Added %d new botty chats" % cur.rowcount)
 
 
 get_chats_q = """
@@ -25,6 +35,7 @@ SELECT * FROM (
   SELECT channel_id,
          message_count,
          (message_count - last_count) as new_messages,
+         bot_messages,
          age,
          CAST((100 * (message_count - last_count))/(100+message_count) + age / (1440 * 7) - (IF(COALESCE(blacklisted,0)>0, 1, 0)) - (message_count / 100000) AS DOUBLE) AS score,
          is_bad,
@@ -47,6 +58,10 @@ SELECT * FROM (
     LEFT JOIN options2 USING (channel_id)
     LEFT JOIN serverinfo_current USING (server_id)
     LEFT JOIN serverinfo USING (server_id, serverinfo_id)
+    LEFT JOIN (
+      SELECT channel_id, SUM(message_count) AS bot_messages
+      FROM chat_counters
+      WHERE user_id IN (SELECT id FROM bots) AND user_id NOT IN (SELECT id FROM good_bots) GROUP BY channel_id) bmsg USING (channel_id)
 ) b WHERE score > 0.1 OR uniqueness < 0 ORDER BY score DESC LIMIT 10;
 """
 
@@ -99,27 +114,36 @@ def update_step(cur):
   if not chats_to_update:
     print("No chats to update")
     return 0
-  print(tabulate(chats_to_update, headers=['channel_id', 'msg', 'newmsg', 'lastupd', 'score', 'is_bad', 'blacklist', 'uniq', 'Gss', 'Bss', 'Botss', 'chat_name']))
-  (channel_id, msg_count, msg_new, age, score, is_bad, is_blacklisted, uniq, _goodness, _badness, _botness, chatname) = chats_to_update[0]
+  print(tabulate(chats_to_update, headers=['channel_id', 'msg', 'newmsg', 'botmsg', 'lastupd', 'score', 'is_bad', 'blacklist', 'uniq', 'Gss', 'Bss', 'Botss', 'chat_name']))
+  (channel_id, msg_count, msg_new, bot_messages, age, score, is_bad, is_blacklisted, uniq, _goodness, _badness, _botness, chatname) = chats_to_update[0]
   server_id = get_server_for_channel(cur, channel_id)
   print("Updating stats for %s %d %s" % (server_id, channel_id, chatname))
-  (new_uniq, badness, goodness) = get_score(cur, server_id, channel_id)
   botness = get_botness(cur, channel_id)
-  print("Changed uniq from %f to %f (%f) good %.3f bad %.3f bot %.3f" % (uniq, new_uniq, float(new_uniq)-float(uniq), goodness, badness, botness))
-  write_score(cur, channel_id, new_uniq, msg_count, goodness, badness, botness)
-  if (is_bad is None) and (
-    (badness > 0.1) or
-    (new_uniq < 0.1)):
-    print("Marking chat as bad.")
-    set_bad(cur, channel_id)
-  if (is_blacklisted is None) and is_bad and (
-    (new_uniq < 0.01 and msg_count > 1000) or
-    (badness > 0.3 and msg_count > 500) or
-    (badness > 0.6)):
-    print("Blacklisting chat.")
-    set_blacklisted(cur, channel_id)
-  if any((bw in chatname for bw in badchannels)):
-    print("Chat name contains bad channel name")
+  if msg_count > 100:
+    (new_uniq, badness, goodness) = get_score(cur, server_id, channel_id)
+    print("Changed uniq from %f to %f (%f) good %.3f bad %.3f bot %.3f" % (uniq, new_uniq, float(new_uniq)-float(uniq), goodness, badness, botness))
+    write_score(cur, channel_id, new_uniq, msg_count, goodness, badness, botness)
+    if (is_bad is None) and (
+      (badness > 0.1) or
+      (new_uniq < 0.1) or
+      (botness > 0.5)):
+      print("Marking chat as bad.")
+      set_bad(cur, channel_id)
+    if (is_blacklisted is None) and is_bad and (
+      (new_uniq < 0.01 and msg_count > 1000) or
+      (badness > 0.3 and msg_count > 500) or
+      (badness > 0.6)):
+      print("Blacklisting chat.")
+      set_blacklisted(cur, channel_id)
+  else:
+    print("Not enough messages, botness = %.3f" % botness)
+    if (is_bad is None) and (botness > 0.8):
+      print("Marking chat as bad.")
+      set_bad(cur, channel_id)
+    if (is_blacklisted is None) and (botness > 0.9):
+      print("Blacklisting chat.")
+      set_blacklisted(cur, channel_id)
+    write_score(cur, channel_id, None, msg_count, None, None, botness)
   return score
 
 varsleep = 60
@@ -128,6 +152,7 @@ varsleep = 60
 while True:
   starttime = time.time()
   add_new_chats()
+  add_new_bot_chats()
   score = update_step()
   endtime = time.time()
   elaps = endtime-starttime
