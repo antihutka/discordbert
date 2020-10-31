@@ -240,11 +240,8 @@ help_links="""[Add me to your server](https://discordapp.com/oauth2/authorize?cl
 def make_help():
   emb = discord.Embed(description="Sobert's silly help thing")
   emb.add_field(name="/!help", value="Show this text")
-  emb.add_field(name="/!set reply_prob *P*", value="Set my reply probability for the current channel to **P** (0 to 1.0). Defaults to 0, except in DMs.")
-  emb.add_field(name="/!set max_bot_msg_length *L*", value="Don't process messages from bots longer than **L** characters. Defaults to 200.")
-  emb.add_field(name="/!set prefix_only *0|1*", value="Only match keywords as prefixes, not anywhere in the message.")
-  emb.add_field(name="/!set mention_only *0|1*", value="Don't match on name, only @mention.")
-  emb.add_field(name="/!set extra_prefix *P*", value="Set an additional prefix to reply to")
+  emb.add_field(name="/!list_options", value="List configurable options")
+  emb.add_field(name="/!set *option_name* *option_value*", value="Set an option")
   emb.add_field(name="/!set *option_name*", value="Unsets a previously set option")
   emb.add_field(name="/!badword *word*", value="Add or remove word to/from per-server bad word list")
   emb.add_field(name="Links and stuff", value=help_links)
