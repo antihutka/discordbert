@@ -250,6 +250,20 @@ def make_help():
   emb.add_field(name="Links and stuff", value=help_links)
   return emb
 
+async def send_option_list(si, ci, channel):
+  emb = discord.Embed(description="Options, set using /!set")
+  for opt in options.options.values():
+    if opt.settable:
+      v = 'type: ' + opt.type.__name__
+      if opt.default_group == opt.default_user:
+        v += '\ndefault: %s' % opt.default_group
+      else:
+        v += '\nuser default: %s\nchannel default: %s' % (opt.default_user, opt.default_group)
+      v += '\ncurrent value: %s' % options.get_option(si, ci, opt.name)
+      v += '\n%s' % opt.description
+      emb.add_field(name=opt.name, value=v)
+  await channel.send(embed=emb)
+
 #Type */!set reply_to_bots 0|1* to enable or disable. Defaults to 0.
 
 cmd_replies = set()
@@ -359,6 +373,9 @@ async def on_message(message):
   elif txt == '/!badword':
     bws = badword_get(si or ci)
     await message.channel.send("< badwords: %s >" % repr(bws))
+
+  elif txt == '/!list_options':
+    await send_option_list(si, ci, message.channel)
 
   else:
     queued = await nn.queued_for_key(str(ci))
