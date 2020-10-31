@@ -21,32 +21,6 @@ options_list = [
 
 options = { o.name : o for o in options_list }
 
-default_user = {
-  'reply_prob': 1,
-  'mention_only': 0,
-  'prefix_only': 0,
-  'extra_prefix': '',
-  'max_bot_msg_length' : 200,
-  'reply_to_bots' : 0,
-  'ignore_channel': 0,
-  'is_bad': 0,
-  'is_hidden': 0,
-  'blacklisted': 0
-}
-
-default_group = {
-  'reply_prob': 0,
-  'mention_only': 1,
-  'prefix_only': 1,
-  'extra_prefix': '',
-  'max_bot_msg_length' : 200,
-  'reply_to_bots' : 0,
-  'ignore_channel': 0,
-  'is_bad': 0,
-  'is_hidden': 0,
-  'blacklisted': 0
-}
-
 optioncache = TTLCache(1024, 60*60)
 
 @cached(optioncache)
