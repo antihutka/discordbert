@@ -12,11 +12,12 @@ options_list = [
   ChatOption(name='prefix_only',        type=int,   settable=True,  default_user=0,   default_group=1,   contexts=('channel', 'server'),         description='Only recognize triggers as prefixes instead of anywhere in the message'),
   ChatOption(name='extra_prefix',       type=str,   settable=True,  default_user='',  default_group='',  contexts=('channel', 'server', 'user'), description='Trigger responses by an additional prefix'),
   ChatOption(name='max_bot_msg_length', type=int,   settable=True,  default_user=200, default_group=200, contexts=('channel', 'server', 'user'), description="Process (but don't respond to) messages shorter than N characters"),
+  ChatOption(name='delete_after',       type=int,   settable=True,  default_user=0,   default_group=0,   contexts=('channel', 'server'),         description="Delete training data older than N days, 0=disabled"),
   ChatOption(name='reply_to_bots',      type=int,   settable=False, default_user=0,   default_group=0,   contexts=('channel', 'server', 'user'), description=''),
-  ChatOption(name='ignore_channel',     type=int,   settable=False, default_user=0,   default_group=0,   contexts=('channel'),         description=''),
-  ChatOption(name='is_bad',             type=int,   settable=False, default_user=0,   default_group=0,   contexts=('channel'),         description=''),
-  ChatOption(name='is_hidden',          type=int,   settable=False, default_user=0,   default_group=0,   contexts=('channel'),         description=''),
-  ChatOption(name='blacklisted',        type=int,   settable=False, default_user=0,   default_group=0,   contexts=('channel'),         description='')
+  ChatOption(name='ignore_channel',     type=int,   settable=False, default_user=0,   default_group=0,   contexts=('channel'),                   description=''),
+  ChatOption(name='is_bad',             type=int,   settable=False, default_user=0,   default_group=0,   contexts=('channel'),                   description=''),
+  ChatOption(name='is_hidden',          type=int,   settable=False, default_user=0,   default_group=0,   contexts=('channel'),                   description=''),
+  ChatOption(name='blacklisted',        type=int,   settable=False, default_user=0,   default_group=0,   contexts=('channel'),                   description='')
 ]
 
 options = { o.name : o for o in options_list }
