@@ -45,6 +45,17 @@ def try_delete(cur, msg):
     else:
       cur.execute("INSERT INTO deleted_counter (channel_id, del_user_r) VALUES (%s,1) ON DUPLICATE KEY UPDATE del_user_r = del_user_r + 1", (msg.channel_id,))
     return True
+  if msg.count == 1:
+    assert(msg.first_id == msg.id)
+    cur.execute("DELETE FROM chat_hashcounts WHERE hash=UNHEX(SHA2((SELECT message FROM chat WHERE id=%s),256)) AND count=1", (msg.id,))
+    assert(cur.rowcount==1)
+    cur.execute("DELETE FROM chat WHERE id=%s", (msg.id,))
+    assert(cur.rowcount==1)
+    if msg.is_bot:
+      cur.execute("INSERT INTO deleted_counter (channel_id, del_bot_u) VALUES (%s,1) ON DUPLICATE KEY UPDATE del_bot_u = del_bot_u + 1", (msg.channel_id,))
+    else:
+      cur.execute("INSERT INTO deleted_counter (channel_id, del_user_u) VALUES (%s,1) ON DUPLICATE KEY UPDATE del_user_u = del_user_u + 1", (msg.channel_id,))
+    return True
   return False
 
 def scan_db():
