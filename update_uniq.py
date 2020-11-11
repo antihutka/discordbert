@@ -23,7 +23,7 @@ def add_new_bot_chats(cur):
   cur.execute("SELECT channel_id FROM chat_counters "
               "  WHERE channel_id NOT IN (SELECT channel_id FROM chat_uniqueness) AND user_id IN (SELECT id FROM bots) AND user_id NOT IN (SELECT id FROM good_bots) "
               "  GROUP BY channel_id "
-              "  HAVING SUM(message_count) > 10000")
+              "  HAVING SUM(message_count) > 5000")
   vals = cur.fetchall()
   cur.executemany("INSERT INTO chat_uniqueness(channel_id) VALUES (%s)", vals)
   if cur.rowcount > 0:
