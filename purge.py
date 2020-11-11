@@ -29,21 +29,21 @@ def get_batch(cur, lastid, cnt):
 def should_delete(msg):
   if msg.age < 30:
     return False
-  if msg.is_bot and msg.is_bad and msg.ch_bad and msg.ch_black and len(msg.text) > 100:
+  if msg.is_bot and msg.is_bad and msg.ch_bad and msg.ch_black and len(msg.text) > 50:
     return True
   return False
 
 def try_delete(cur, msg):
-  #print('Deleting: %s' % (msg,))
+  print('Deleting: %s' % (msg,))
   if msg.count > 1 and msg.first_id < msg.id:
     cur.execute("UPDATE chat_hashcounts SET count = count - 1 WHERE hash=UNHEX(SHA2((SELECT message FROM chat WHERE id=%s),256))", (msg.id,))
     assert(cur.rowcount==1)
     cur.execute("DELETE FROM chat WHERE id=%s", (msg.id,))
     assert(cur.rowcount==1)
     if msg.is_bot:
-      cur.execute("INSERT INTO deleted_counter (channel_id, del_bot_u) VALUES (%s,1) ON DUPLICATE KEY UPDATE del_bot_r = del_bot_r + 1", (msg.channel_id,))
+      cur.execute("INSERT INTO deleted_counter (channel_id, del_bot_r) VALUES (%s,1) ON DUPLICATE KEY UPDATE del_bot_r = del_bot_r + 1", (msg.channel_id,))
     else:
-      cur.execute("INSERT INTO deleted_counter (channel_id, del_user_u) VALUES (%s,1) ON DUPLICATE KEY UPDATE del_user_r = del_user_r + 1", (msg.channel_id,))
+      cur.execute("INSERT INTO deleted_counter (channel_id, del_user_r) VALUES (%s,1) ON DUPLICATE KEY UPDATE del_user_r = del_user_r + 1", (msg.channel_id,))
     return True
   return False
 
