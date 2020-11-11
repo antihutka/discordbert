@@ -29,7 +29,7 @@ def get_batch(cur, lastid, cnt):
 def should_delete(msg):
   if msg.age < 30:
     return False
-  if msg.is_bot and msg.is_bad and msg.ch_bad and msg.ch_black and len(msg.text) > 50:
+  if msg.is_bot and msg.is_bad and msg.ch_bad and msg.ch_black:
     return True
   return False
 
@@ -79,7 +79,7 @@ def scan_db():
         cnt_deletable += 1
         if try_delete(cur, msg):
           cnt_deleted += 1
-    print("Checked %d deletable %d deleted %d" % (cnt_checked, cnt_deletable, cnt_deleted))
+    print("Checked %d deletable %d (%.2f%%) deleted %d (%.2f%%)" % (cnt_checked, cnt_deletable, cnt_deletable/cnt_checked*100, cnt_deleted, cnt_deleted/cnt_checked*100))
     dbcon.commit()
 
 scan_db()
