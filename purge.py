@@ -29,14 +29,16 @@ def get_batch(cur, lastid, cnt):
 def should_delete(msg):
   if msg.age < 30:
     return False
-  if msg.is_bot and msg.is_bad and msg.ch_bad and msg.ch_black:
+  if msg.is_bot and msg.ch_bad and msg.ch_black:
+    return True
+  if msg.is_bad and msg.ch_bad and msg.ch_black:
     return True
   return False
 
 def try_delete(cur, msg):
   print('Deleting: %s' % (msg,))
-  if msg.count > 1 and msg.first_id < msg.id:
-    cur.execute("UPDATE chat_hashcounts SET count = count - 1 WHERE hash=UNHEX(SHA2((SELECT message FROM chat WHERE id=%s),256))", (msg.id,))
+  if msg.count > 1 and msg.first_id != msg.id:
+    cur.execute("UPDATE chat_hashcounts SET count = count - 1 WHERE hash=UNHEX(SHA2((SELECT message FROM chat WHERE id=%s),256)) AND message_id <> %s", (msg.id, msg.id))
     assert(cur.rowcount==1)
     cur.execute("DELETE FROM chat WHERE id=%s", (msg.id,))
     assert(cur.rowcount==1)
@@ -81,5 +83,7 @@ def scan_db():
           cnt_deleted += 1
     print("Checked %d deletable %d (%.2f%%) deleted %d (%.2f%%)" % (cnt_checked, cnt_deletable, cnt_deletable/cnt_checked*100, cnt_deleted, cnt_deleted/cnt_checked*100))
     dbcon.commit()
+    if cnt_deleted > 100000:
+      break
 
 scan_db()
