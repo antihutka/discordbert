@@ -36,7 +36,6 @@ def should_delete(msg):
   return False
 
 def try_delete(cur, msg):
-  print('Deleting: %s' % (msg,))
   if msg.count > 1 and msg.first_id != msg.id:
     cur.execute("UPDATE chat_hashcounts SET count = count - 1 WHERE hash=UNHEX(SHA2((SELECT message FROM chat WHERE id=%s),256)) AND message_id <> %s", (msg.id, msg.id))
     assert(cur.rowcount==1)
@@ -80,6 +79,7 @@ def scan_db():
       if should_delete(msg):
         cnt_deletable += 1
         if try_delete(cur, msg):
+          print('Deleting: %s' % (msg,))
           cnt_deleted += 1
     print("Checked %d (%.2f%%) deletable %d (%.2f%%) deleted %d (%.2f%%)" % (cnt_checked, cnt_checked / lastid * 100, cnt_deletable, cnt_deletable/cnt_checked*100, cnt_deleted, cnt_deleted/cnt_checked*100))
     dbcon.commit()
