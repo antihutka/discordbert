@@ -6,7 +6,7 @@ from sobutils.database import get_dbcon
 
 Config.read(sys.argv[1])
 
-MsgRow = namedtuple('MsgRow', 'id is_bad is_bot age ch_bad ch_black count first_id channel_id text')
+MsgRow = namedtuple('MsgRow', 'id is_bad is_bot age ch_bad ch_black count first_id channel_id server_id expire_days channel_expire text')
 
 def get_maxid(cur):
   cur.execute("SELECT MAX(id) FROM chat")
@@ -17,22 +17,39 @@ def get_batch(cur, lastid, cnt):
               "  UNHEX(SHA2(message,256)) IN (SELECT hash FROM bad_messages) AS msg_bad, "
               "  user_id IN (SELECT id FROM bots) AND user_id NOT IN (SELECT id FROM good_bots) AS msg_bot, "
               "  TIMESTAMPDIFF(DAY, date, CURRENT_TIMESTAMP) AS age, "
-              "  is_bad, blacklisted, count, message_id, channel_id, message "
+              "  is_bad, blacklisted, count, message_id, channel_id, server_id, expire_days, delete_after, message "
               "FROM chat "
               "LEFT JOIN chat_hashcounts ON UNHEX(SHA2(message,256)) = hash "
               "LEFT JOIN options2 USING (channel_id) "
+              "LEFT JOIN server_expire USING (server_id) "
               "WHERE id > %s "
               "ORDER BY id "
               "ASC LIMIT %s", (lastid, cnt))
   return cur.fetchall()
 
 def should_delete(msg):
-  if msg.age < 30:
+  expire_age = 30
+  if msg.expire_days is not None:
+    expire_age = msg.expire_days
+  if msg.channel_expire is not None:
+    expire_age = msg.channel_expire
+
+  if msg.ch_bad and msg.ch_black and msg.age > 7: # purge blacklisted channels faster
+    return True
+
+  if msg.age < expire_age: # don't delete messages that aren't old enough
     return False
-  if msg.is_bad and msg.ch_bad and msg.ch_black:
+
+  if msg.ch_bad and msg.ch_black:
     return True
   if msg.is_bot and msg.ch_bad:
     return True
+  if msg.is_bot and msg.is_bad:
+    return True
+  if msg.is_bad and len(msg.text) > 50:
+    return True
+  if not msg.server_id:
+    return False
   return False
 
 def try_delete(cur, msg):
