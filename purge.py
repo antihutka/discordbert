@@ -40,7 +40,7 @@ def should_delete(msg):
   if msg.age < expire_age: # don't delete messages that aren't old enough
     return False
 
-  if msg.ch_bad and msg.ch_black:
+  if msg.ch_bad:
     return True
   if msg.is_bot and msg.ch_bad:
     return True
