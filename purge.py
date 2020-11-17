@@ -42,14 +42,12 @@ def should_delete(msg):
 
   if msg.ch_bad:
     return True
-  if msg.is_bot and msg.ch_bad:
+  if msg.is_bot:
     return True
-  if msg.is_bot and msg.is_bad:
+  if msg.is_bad:
     return True
-  if msg.is_bad and len(msg.text) > 50:
+  if len(msg.text) > 90:
     return True
-  if not msg.server_id:
-    return False
   return False
 
 def try_delete(cur, msg):
