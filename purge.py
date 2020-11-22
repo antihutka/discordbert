@@ -40,15 +40,7 @@ def should_delete(msg):
   if msg.age < expire_age: # don't delete messages that aren't old enough
     return False
 
-  if msg.ch_bad:
-    return True
-  if msg.is_bot:
-    return True
-  if msg.is_bad:
-    return True
-  if len(msg.text) > 0:
-    return True
-  return False
+  return True
 
 def try_delete(cur, msg):
   #print('Trying to delete: %s' % (msg,))
