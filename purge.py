@@ -2,7 +2,7 @@ import sys
 from collections import namedtuple
 
 from sobutils.configuration import Config
-from sobutils.database import get_dbcon
+from sobutils.database import get_dbcon, with_cursor
 
 Config.read(sys.argv[1])
 
@@ -103,4 +103,10 @@ def scan_db():
     if cnt_deleted > 250000:
       break
 
+@with_cursor
+def cleanup_counters(cur):
+  cur.execute("DELETE FROM chat_counters WHERE message_count=0");
+  print("Deleted %d zero counters" % cur.rowcount)
+
 scan_db()
+cleanup_counters()
