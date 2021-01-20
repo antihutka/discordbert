@@ -71,7 +71,10 @@ def get_scores(cur):
 
 def get_botness(cur, channel_id):
   cur.execute("SELECT SUM(IF(user_id IN (SELECT id FROM bots WHERE id NOT IN (SELECT id FROM good_bots)), message_count, 0)) / SUM(message_count) FROM chat_counters WHERE channel_id=%s", (channel_id,))
-  return cur.fetchone()[0]
+  r = cur.fetchone()[0]
+  if r is None:
+    return 0
+  return r
 
 def get_server_for_channel(cur, channel_id):
   cur.execute("SELECT server_id FROM chat_counters WHERE channel_id=%s LIMIT 1", (channel_id,))

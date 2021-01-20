@@ -49,7 +49,7 @@ def try_delete(cur, msg):
     cur.execute("UPDATE chat_hashcounts SET count = count - 1 WHERE hash=UNHEX(SHA2((SELECT message FROM chat WHERE id=%s),256)) AND message_id <> %s", (msg.id, msg.id))
     assert(cur.rowcount==1)
     cur.execute("UPDATE chat_counters SET message_count = message_count - 1 WHERE channel_id = %s AND user_id = %s", (msg.channel_id, msg.user_id))
-    assert(cur.rowcount==1)
+    assert(cur.rowcount<=1)
     cur.execute("DELETE FROM chat WHERE id=%s", (msg.id,))
     assert(cur.rowcount==1)
     if msg.is_bot:
@@ -65,7 +65,9 @@ def try_delete(cur, msg):
     cur.execute("DELETE FROM chat_hashcounts WHERE hash=UNHEX(SHA2((SELECT message FROM chat WHERE id=%s),256)) AND count=1", (msg.id,))
     assert(cur.rowcount==1)
     cur.execute("UPDATE chat_counters SET message_count = message_count - 1 WHERE channel_id = %s AND user_id = %s", (msg.channel_id, msg.user_id))
-    assert(cur.rowcount==1)
+    if (cur.rowcount != 1):
+      print("Warning: no counter?")
+    assert(cur.rowcount<=1)
     cur.execute("DELETE FROM chat WHERE id=%s", (msg.id,))
     assert(cur.rowcount==1)
     if msg.is_bot:
