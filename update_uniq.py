@@ -1,4 +1,5 @@
 import time
+import traceback
 from tabulate import tabulate
 
 from botlib.util import aretry
@@ -154,16 +155,21 @@ varsleep = 60
 
 
 while True:
-  starttime = time.time()
-  add_new_chats()
-  add_new_bot_chats()
-  score = update_step()
-  endtime = time.time()
-  elaps = endtime-starttime
-  if score < 0.9:
-    varsleep = varsleep + 1
-  if score > 1.1 and varsleep > 10:
-    varsleep = varsleep - 1
-  sleeptime = (elaps * 10 + varsleep) / max(0.25, score)
-  print("Took %f, sleep for %f" % (elaps, sleeptime))
-  time.sleep(sleeptime)
+  try:
+    starttime = time.time()
+    add_new_chats()
+    add_new_bot_chats()
+    score = update_step()
+    endtime = time.time()
+    elaps = endtime-starttime
+    if score < 0.9:
+      varsleep = varsleep + 1
+    if score > 1.1 and varsleep > 10:
+      varsleep = varsleep - 1
+    sleeptime = (elaps * 10 + varsleep) / max(0.25, score)
+    print("Took %f, sleep for %f" % (elaps, sleeptime))
+    time.sleep(sleeptime)
+  except:
+    traceback.print_exc()
+    time.sleep(600)
+
