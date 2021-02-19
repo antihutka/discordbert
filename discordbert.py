@@ -409,7 +409,7 @@ async def on_message(message):
           if rpl_txt == '':
             print('ignoring empty reply')
             return
-          rpl_msg = await message.channel.send(rpl_txt)
+          rpl_msg = await message.channel.send(rpl_txt, allowed_mentions = discord.AllowedMentions(everyone=False))
       finally:
         currently_sending[ci] -= 1
       end_time = time()
