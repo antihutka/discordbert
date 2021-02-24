@@ -44,6 +44,8 @@ def should_delete(msg):
 
 def try_delete(cur, msg):
   #print('Trying to delete: %s' % (msg,))
+  if msg.count is None:
+    print('Bad message? %s' % (msg,))
   if msg.count > 1 and msg.first_id != msg.id:
     print('Deleting: %s' % (msg,))
     cur.execute("UPDATE chat_hashcounts SET count = count - 1 WHERE hash=UNHEX(SHA2((SELECT message FROM chat WHERE id=%s),256)) AND message_id <> %s", (msg.id, msg.id))
