@@ -102,7 +102,7 @@ def scan_db():
         cnt_deletable += 1
         if try_delete(cur, msg):
           cnt_deleted += 1
-    print("Checked %d (%.2f%%) deletable %d (%.2f%%) deleted %d (%.2f%%)" % (cnt_checked, cnt_checked / lastid * 100, cnt_deletable, cnt_deletable/cnt_checked*100, cnt_deleted, cnt_deleted/cnt_checked*100))
+    print("Checked %d (%.2f%%) deletable %d (%.2f%%) deleted %d (%.2f%%) undeletable %d" % (cnt_checked, cnt_checked / lastid * 100, cnt_deletable, cnt_deletable/cnt_checked*100, cnt_deleted, cnt_deleted/cnt_checked*100, cnt_deletable - cnt_deleted))
     dbcon.commit()
     if cnt_deleted > 250000:
       break
