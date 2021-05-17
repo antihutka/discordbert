@@ -60,7 +60,7 @@ def set_option(channel_id, option_name, value, user_only = True):
   try:
     value_parsed = None if value is None else options[option_name].type(value)
   except ValueError:
-    raise OptionError("Can't parse value %s as %s" % (repr(option_name), options[option_name].type.__name__))
+    raise OptionError("Can't parse value %s as %s" % (repr(value), options[option_name].type.__name__))
   optioncache.pop(hashkey(channel_id), None)
   try:
     set_option_db(channel_id, option_name, value_parsed)
