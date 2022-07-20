@@ -14,7 +14,10 @@ class HTTPNN:
     return self.locks[key]
 
   async def queued_for_key(self, key):
-    return len(self.get_lock(key)._waiters)
+    w = self.get_lock(key)._waiters
+    if w is None:
+      return 0
+    return len(w)
 
   @aretry(5)
   async def put_(self, key, message):
