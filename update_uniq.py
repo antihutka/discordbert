@@ -37,8 +37,9 @@ SELECT * FROM (
          message_count,
          (message_count - last_count) as new_messages,
          bot_messages,
+         last_botcount,
          age,
-         CAST((100 * (message_count - last_count))/(100+message_count) + age / (1440 * 7) - (IF(COALESCE(blacklisted,0)>0, 1, 0)) - (message_count / 100000) AS DOUBLE) AS score,
+         CAST((100 * (message_count - last_count))/(100+message_count) + age / (1440 * 7) + (10 * (COALESCE(bot_messages,0) - last_botcount) / (1000 + last_botcount)) - (IF(COALESCE(blacklisted,0)>0, 1, 0)) - (message_count / 100000) AS DOUBLE) AS score,
          is_bad,
          blacklisted,
          COALESCE(uniqueness, -1) AS uniqueness,
@@ -48,6 +49,7 @@ SELECT * FROM (
     SELECT channel_id,
            message_count,
            last_count,
+           last_botcount,
            TIMESTAMPDIFF(MINUTE, last_update, CURRENT_TIMESTAMP) AS age,
            uniqueness,
            goodness, badness, botness
@@ -92,15 +94,18 @@ def get_score(cur, server_id, channel_id):
               "    AND (chat.server_id <=> %s OR chat.server_id IS NULL) AND chat.channel_id=%s", (server_id,channel_id))
   return cur.fetchone()
 
-def write_score(cur, channel_id, uniq, cnt, goodness, badness, botness):
+def write_score(cur, channel_id, uniq, cnt, goodness, badness, botness, bot_messages):
+  if bot_messages is None:
+  	bot_messages = 0
   cur.execute("UPDATE chat_uniqueness SET "
               "  uniqueness = %s, "
               "  last_count = %s, "
               "  goodness = %s, "
               "  badness = %s, "
               "  botness = %s, "
+              "  last_botcount = %s, "
               "  last_update = CURRENT_TIMESTAMP "
-              "WHERE channel_id = %s", (uniq, cnt, goodness, badness, botness, channel_id))
+              "WHERE channel_id = %s", (uniq, cnt, goodness, badness, botness, bot_messages, channel_id))
 
 def set_bad(cur, channel_id):
   cur.execute("INSERT INTO options2 (channel_id, is_bad) VALUES (%s, 1) ON DUPLICATE KEY UPDATE is_bad=1", (channel_id,))
@@ -118,15 +123,15 @@ def update_step(cur):
   if not chats_to_update:
     print("No chats to update")
     return 0
-  print(tabulate(chats_to_update, headers=['channel_id', 'msg', 'newmsg', 'botmsg', 'lastupd', 'score', 'is_bad', 'blacklist', 'uniq', 'Gss', 'Bss', 'Botss', 'chat_name']))
-  (channel_id, msg_count, msg_new, bot_messages, age, score, is_bad, is_blacklisted, uniq, _goodness, _badness, _botness, chatname) = chats_to_update[0]
+  print(tabulate(chats_to_update, headers=['channel_id', 'msg', 'newmsg', 'botmsg', 'lastbotcnt', 'lastupd', 'score', 'is_bad', 'blacklist', 'uniq', 'Gss', 'Bss', 'Botss', 'chat_name']))
+  (channel_id, msg_count, msg_new, bot_messages, last_botcount, age, score, is_bad, is_blacklisted, uniq, _goodness, _badness, _botness, chatname) = chats_to_update[0]
   server_id = get_server_for_channel(cur, channel_id)
   print("Updating stats for %s %d %s" % (server_id, channel_id, chatname))
   botness = get_botness(cur, channel_id)
   if msg_count > 100:
     (new_uniq, badness, goodness) = get_score(cur, server_id, channel_id)
     print("Changed uniq from %f to %f (%f) good %.3f bad %.3f bot %.3f" % (uniq, new_uniq, float(new_uniq)-float(uniq), goodness, badness, botness))
-    write_score(cur, channel_id, new_uniq, msg_count, goodness, badness, botness)
+    write_score(cur, channel_id, new_uniq, msg_count, goodness, badness, botness, bot_messages)
     if (is_bad is None) and (
       (badness > 0.1) or
       (new_uniq < 0.1) or
@@ -148,7 +153,7 @@ def update_step(cur):
     if (is_blacklisted is None) and (botness > 0.9):
       print("Blacklisting chat.")
       set_blacklisted(cur, channel_id)
-    write_score(cur, channel_id, None, msg_count, None, None, botness)
+    write_score(cur, channel_id, None, msg_count, None, None, botness, bot_messages)
   return score
 
 varsleep = 60
