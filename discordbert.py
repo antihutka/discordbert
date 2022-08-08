@@ -304,7 +304,8 @@ async def on_message(message):
   if message.id in cmd_replies:
     print('(not logging)')
     return
-  log_chat(message, si, sn, ci, cn, ui, un, txt, message.author.bot)
+  if options.get_option(si, ci, 'delete_after') > 0:
+    log_chat(message, si, sn, ci, cn, ui, un, txt, message.author.bot)
   for u in message.mentions:
     log_mention(u.id, u.name, u.mention)
   for r in message.role_mentions:
