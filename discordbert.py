@@ -82,6 +82,24 @@ def log_user(cur, user):
     cache_on_commit(cur, userinfo_current, uid, infoid)
   return infoid
 
+optout_cache = LRUCache(8*1024)
+
+@with_cursor
+def opt_out(cur, userid):
+  cur.execute("INSERT INTO `user_optouts`(`user_id`) VALUES (%s)", (userid,))
+  optout_cache.pop(hashkey(userid), None)
+
+@with_cursor
+def opt_in(cur, userid):
+  cur.execute("DELETE FROM `user_optouts` WHERE `user_id` = %s", (userid,))
+  optout_cache.pop(hashkey(userid), None)
+
+@cached(optout_cache)
+@with_cursor
+def is_opted_out(cur, userid):
+  cur.execute("SELECT COUNT(*) FROM `user_optouts` WHERE `user_id` = %s", (userid,))
+  return cur.fetchone()[0] > 0
+
 serverinfo_cache = {}
 serverinfo_current = {}
 def log_server(cur, server):
@@ -304,12 +322,12 @@ async def on_message(message):
   if message.id in cmd_replies:
     print('(not logging)')
     return
-  if options.get_option(si, ci, 'delete_after') > 0:
+  if options.get_option(si, ci, 'delete_after') > 0 and not (is_opted_out(ui)):
     log_chat(message, si, sn, ci, cn, ui, un, txt, message.author.bot)
-  for u in message.mentions:
-    log_mention(u.id, u.name, u.mention)
-  for r in message.role_mentions:
-    log_role(si, r.id, r.name, r.mention)
+    for u in message.mentions:
+      log_mention(u.id, u.name, u.mention)
+    for r in message.role_mentions:
+      log_role(si, r.id, r.name, r.mention)
 
   if not cansend:
     return
@@ -374,6 +392,16 @@ async def on_message(message):
 
   elif txt == '/!list_options':
     await send_option_list(si, ci, message.channel)
+
+  elif txt == '/!opt_out':
+    if is_opted_out(ui):
+      await message.channel.send("< user already opted out >")
+    else:
+      opt_out(ui)
+      await message.channel.send("< user opted out of message logging >")
+  elif txt == '/!opt_in':
+    opt_in(ui)
+    await message.channel.send("< user opted back in >")
 
   else:
     queued = await nn.queued_for_key(str(ci))
