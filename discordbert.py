@@ -262,6 +262,8 @@ def make_help():
   emb.add_field(name="/!set *option_name* *option_value*", value="Set an option")
   emb.add_field(name="/!set *option_name*", value="Unsets a previously set option")
   emb.add_field(name="/!badword *word*", value="Add or remove word to/from per-server bad word list")
+  emb.add_field(name="/!opt_out", value="Opt out of saving any of the user's messages in any channel/server for training")
+  emb.add_field(name="/!opt_in", value="Opt in into collecting training data again")
   emb.add_field(name="Links and stuff", value=help_links)
   return emb
 
