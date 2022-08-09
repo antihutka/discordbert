@@ -253,7 +253,8 @@ def should_reply(si, sn, ci, cn, ui, un, txt, server, channel, author):
 
 help_links="""[Add me to your server](https://discordapp.com/oauth2/authorize?client_id=477996444775743488&scope=bot)
 [Support server](https://discord.gg/EhNr4hR)
-[DBL link](https://discordbots.org/bot/477996444775743488)"""
+[DBL link](https://discordbots.org/bot/477996444775743488)
+[Privacy policy](https://hammy.sk/sobert_discord_privacy_policy.txt)"""
 
 def make_help():
   emb = discord.Embed(description="Sobert's silly help thing")
