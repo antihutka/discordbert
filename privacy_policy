@@ -1,0 +1,6 @@
+Message content, timestamps, user, server and channel IDs, mentions in the messages are stored and used for regular retraining of the neural network model and for detecting and blocking spam channels.
+Message data is kept for the time specified by the delete_after option, up to 30 days. Expired data is deleted multiple times per day.
+When delete_after is set to 0, no message data will be logged. Users can also opt out out using the /!opt_out command. This disables saving of any of the user's messages on any server and channel.
+Configured options for each channel are stored permanently.
+All of the data is stored in a database on an encrypted filesystem. No stored data is shared with third parties.
+You can request a copy of your data or request deletion of all of your data in the support server. (https://discord.com/invite/EhNr4hR)
