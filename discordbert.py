@@ -254,7 +254,7 @@ def should_reply(si, sn, ci, cn, ui, un, txt, server, channel, author):
 help_links="""[Add me to your server](https://discordapp.com/oauth2/authorize?client_id=477996444775743488&scope=bot)
 [Support server](https://discord.gg/EhNr4hR)
 [DBL link](https://discordbots.org/bot/477996444775743488)
-[Privacy policy](https://hammy.sk/sobert_discord_privacy_policy.txt)"""
+[Privacy policy](https://hammy.sk/sobert_discord_privacy_policy.txt) or use /!privacy"""
 
 def make_help():
   emb = discord.Embed(description="Sobert's silly help thing")
@@ -265,6 +265,7 @@ def make_help():
   emb.add_field(name="/!badword *word*", value="Add or remove word to/from per-server bad word list")
   emb.add_field(name="/!opt_out", value="Opt out of saving any of the user's messages in any channel/server for training")
   emb.add_field(name="/!opt_in", value="Opt in into collecting training data again")
+  emb.add_field(name="/!privacy", value="Show privacy policy")
   emb.add_field(name="Links and stuff", value=help_links)
   return emb
 
@@ -287,6 +288,10 @@ async def send_option_list(si, ci, channel):
 cmd_replies = set()
 
 currently_sending = {}
+
+def get_pp():
+  with open('privacy_policy', 'r') as f:
+    return f.read()
 
 @client.event
 async def on_message(message):
@@ -405,6 +410,9 @@ async def on_message(message):
   elif txt == '/!opt_in':
     opt_in(ui)
     await message.channel.send("< user opted back in >")
+
+  elif txt == '/!privacy':
+    await message.channel.send("Privacy policy: \n" + get_pp())
 
   else:
     queued = await nn.queued_for_key(str(ci))
