@@ -24,7 +24,6 @@ Config.read(sys.argv[1])
 logging.basicConfig(level=logging.INFO)
 
 nn = HTTPNN(Config.get('Backend', 'Url'), Config.get('Backend', 'Keyprefix'))
-asyncio.get_event_loop().run_until_complete(nn.initialize())
 
 logqueue = Queue()
 start_thread(args=(logqueue, 'dblogger'))
@@ -34,7 +33,7 @@ channelinfo_current = {}
 def log_channel(cur, channel):
   cid = channel.id
   cname = getattr(channel, 'name', None)
-  cserver = channel.guild.id if hasattr(channel, 'guild') else None
+  cserver = channel.guild.id if (hasattr(channel, 'guild') and channel.guild) else None
   key = (cid, cname, cserver)
   if key in channelinfo_cache:
     infoid = channelinfo_cache[key]
@@ -172,7 +171,9 @@ def badword_del(cur, server_id, badword):
   cur.execute("DELETE FROM badwords WHERE server_id = %s AND badword = %s", (server_id, badword))
   badwordcache.pop(hashkey(server_id), None)
 
-client = discord.Client()
+i = discord.Intents.default()
+i.message_content = True
+client = discord.Client(intents=i)
 
 @client.event
 async def on_ready():
@@ -458,4 +459,10 @@ async def on_message(message):
         await rpl_msg.edit(content=rpl_txt + ('\n*reply delayed by %f seconds*' % (reply_delay)))
         print('message took %f seconds to generate' % (reply_delay))
 
-client.run(Config.get('Discord', 'Token'))
+async def runclient():
+  await nn.initialize()
+  await client.start(Config.get('Discord', 'Token'))
+
+loop = asyncio.new_event_loop()
+asyncio.set_event_loop(loop)
+loop.run_until_complete(runclient())
