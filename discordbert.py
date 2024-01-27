@@ -354,7 +354,7 @@ async def on_message(message):
     await message.channel.send(embed=make_help())
 
   elif txt.startswith('/!set '):
-    if message.guild and not message.author.permissions_in(message.channel).manage_channels:
+    if message.guild and not message.channel.permissions_for(message.author).manage_channels:
       cmd_replies.add((await message.channel.send("< only people with manage_channels permission can set options >")).id)
       return
     splt = txt.split()
@@ -382,7 +382,7 @@ async def on_message(message):
     print('options cache flushed')
 
   elif txt.startswith('/!badword '):
-    if message.guild and not message.author.permissions_in(message.channel).manage_channels:
+    if message.guild and not message.channel.permissions_for(message.author).manage_channels:
       await message.channel.send("< only people with manage_channels permission can change badwords >")
       return
     splt = txt.split(' ', 1)
