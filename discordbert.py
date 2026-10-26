@@ -258,7 +258,7 @@ help_links="""[Add me to your server](https://discordapp.com/oauth2/authorize?cl
 [Privacy policy](https://hammy.sk/sobert_discord_privacy_policy.txt) or use /!privacy"""
 
 def make_help():
-  emb = discord.Embed(description="Sobert's silly help thing")
+  emb = discord.Embed(description="Sobert's command list")
   emb.add_field(name="/!help", value="Show this text")
   emb.add_field(name="/!list_options", value="List configurable options")
   emb.add_field(name="/!set *option_name* *option_value*", value="Set an option")
@@ -268,6 +268,11 @@ def make_help():
   emb.add_field(name="/!opt_in", value="Opt in into collecting training data again")
   emb.add_field(name="/!privacy", value="Show privacy policy")
   emb.add_field(name="Links and stuff", value=help_links)
+  return emb
+
+def make_pp(t):
+  emb = discord.Embed(description="Privacy policy")
+  emb.add_field(name="Text", value=t)
   return emb
 
 async def send_option_list(si, ci, channel):
@@ -413,7 +418,8 @@ async def on_message(message):
     await message.channel.send("< user opted back in >")
 
   elif txt == '/!privacy':
-    await message.channel.send("Privacy policy: \n" + get_pp())
+    await message.channel.send(embed=make_pp(get_pp()))
+    #await message.channel.send("Privacy policy: \n" + get_pp())
 
   else:
     queued = await nn.queued_for_key(str(ci))
